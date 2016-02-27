@@ -71,25 +71,6 @@ void setup(void){
     //~ if(mcu & 32) SERIAL_ECHOLNPGM(MSG_SOFTWARE_RESET);
     //~ MCUSR=0;
 
-    //~ SERIAL_ECHOPGM(MSG_MARLIN);
-    //~ SERIAL_ECHOLNPGM(VERSION_STRING);
-    //~ #ifdef STRING_VERSION_CONFIG_H
-        //~ #ifdef STRING_CONFIG_H_AUTHOR
-            //~ SERIAL_ECHO_START;
-            //~ SERIAL_ECHOPGM(MSG_CONFIGURATION_VER);
-            //~ SERIAL_ECHOPGM(STRING_VERSION_CONFIG_H);
-            //~ SERIAL_ECHOPGM(MSG_AUTHOR);
-            //~ SERIAL_ECHOLNPGM(STRING_CONFIG_H_AUTHOR);
-            //~ SERIAL_ECHOPGM("Compiled: ");
-            //~ SERIAL_ECHOLNPGM(__DATE__);
-        //~ #endif
-    //~ #endif
-    //~ SERIAL_ECHO_START;
-    //~ SERIAL_ECHOPGM(MSG_FREE_MEMORY);
-    //~ SERIAL_ECHO(freeMemory());
-    //~ SERIAL_ECHOPGM(MSG_PLANNER_BUFFER_BYTES);
-    //~ SERIAL_ECHOLN((int16_t)sizeof(block_t)*BLOCK_BUFFER_SIZE);
-
     parser_init(); // execute inital G28
 }
 
@@ -139,8 +120,8 @@ void loop(void) {
         CLR_PIN(RX_LED); // enable LED (active LOW)
         if (process_char(c)) {
             if (c=='\n') {
-                // reply OK
-                cmd_print(PSTR("OK %d\n"), STEPPER_QUEUE_used());
+                // reply OK and free entries in stepper queue
+                cmd_print(PSTR("OK %d\n"), STEPPER_QUEUE_SIZE - 1 - STEPPER_QUEUE_used());
                 cmd_flush();
             }
         } else {
