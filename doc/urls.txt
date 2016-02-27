@@ -1,0 +1,23 @@
+# DOC
+
+# ideas about a bresenham algo for arcs/circles/ellipses
+http://members.chello.at/easyfilter/bresenham.pdf
+
+# ideas for accel/deccl of steppers
+http://www.embedded.com/design/mcus-processors-and-socs/4006438/Generate-stepper-motor-speed-profiles-in-real-time
+
+# source pygcodeviewer
+https://code.google.com/archive/p/pygcodeviewer/downloads
+
+# online gcode viewer
+http://qcgeek.com/laseroko/draw.php
+
+# list of gcode previewers
+http://www.shapeoko.com/wiki/index.php/Previewing_G-Code
+
+# list of reprap gcodes:
+http://reprap.org/wiki/Gcode
+
+# NIST standard for G-codes
+http://www.nist.gov/customcf/get_pdf.cfm?pub_id=823374
+

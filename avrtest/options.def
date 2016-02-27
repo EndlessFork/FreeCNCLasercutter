@@ -1,0 +1,106 @@
+/*
+  This file is part of avrtest -- A simple simulator for the
+  Atmel AVR family of microcontrollers designed to test the compiler.
+
+  Copyright (C) 2001, 2002, 2003   Theodore A. Roth, Klaus Rudolph
+  Copyright (C) 2007 Paulo Marques
+  Copyright (C) 2008-2014 Free Software Foundation, Inc.
+   
+  avrtest is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+  
+  avrtest is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with avrtest; see the file COPYING.  If not, write to
+  the Free Software Foundation, 59 Temple Place - Suite 330,
+  Boston, MA 02111-1307, USA.  */
+
+/*
+  Before including this file, define a macro
+
+    AVRTEST_OPT(NAME, DEFLT, VAR)
+
+  where
+
+    NAME
+        is the name of the option as given on the command line with leading
+        "-" or "-no-" stripped off.  Also used to define `OPT_<NAME>'.
+
+    DEFLT
+        Default value if the option is not given.
+
+    VAR
+        Variable attached to that option.
+*/
+
+// -mmcu=ARCH
+AVRTEST_OPT (mmcu=, 0, mmcu)
+
+// -m <MAX_CYCLES> Maximum number of instructions
+AVRTEST_OPT (m, 0, max_instr_count)
+
+// Whether to Initialize SRAM from .data segment
+AVRTEST_OPT (d, 0, initialize_sram)
+
+// -e ENTRY Set program entry point (in bytes)
+AVRTEST_OPT (e, 0, entry_point)
+
+// Whether just to print messages that are explicitly requested
+// Use return status
+AVRTEST_OPT (q, 0, quiet)
+
+// Whether to report information about avrtest's run time
+AVRTEST_OPT (runtime, 0, runtime)
+
+// Whether STDIN_PORT is active
+AVRTEST_OPT (stdin, 1, stdin)
+
+// Whether STDOUT_PORT is active
+AVRTEST_OPT (stdout, 1, stdout)
+
+// Verbosity about avrtest internals
+AVRTEST_OPT (v, 0, verbose)
+
+// -args ... All command args after -args are passed to the target
+// program resp. ignored with -no-args ...
+AVRTEST_OPT (args, 0, args)
+
+
+/* All of the following options are silently ignored by avrtest
+   and behave as if disabled, i.e. specified as -no-...  */
+
+// Whether logging is active at program start
+AVRTEST_OPT (log, 1, log)
+
+// Whether to write a .dot graphic representing program execution
+AVRTEST_OPT (graph, 0, graph)
+
+// File name for .dot file
+AVRTEST_OPT (graph=, 0, graph_filename)
+
+// Where to start that graph
+AVRTEST_OPT (graph-base=, 0, graph_base)
+
+// Whether to account times to reserved (__foo) functions
+AVRTEST_OPT (graph-reserved, 0, graph_reserved)
+
+// Comma-separated list of functions to be treated as leaf functions
+AVRTEST_OPT (graph-leaf=, 0, graph_leaf)
+
+// Comma-separated list of functions with completely expanded sub-tree
+AVRTEST_OPT (graph-sub=, 0, graph_sub)
+
+// Comma-separated list of functions to ignore
+AVRTEST_OPT (graph-skip=, 0, graph_skip)
+
+// Whether to show the whole (dynamic) call graph, no matter
+// if cycles have been attributed to functions or functions are reserved
+AVRTEST_OPT (graph-all, 0, graph_all)
+
+AVRTEST_OPT (debug-tree, 0, debug_tree)

@@ -1,0 +1,968 @@
+2014-11-13  Georg-Johann Lay  <avr@gjlay.de>
+
+	Add call graph generation with -graph.
+	New modules graph.c and perf.c.
+
+	* perf.c: New file.
+	* graph.c: New file.
+	* Makefile: Add rules to graph.o, perf.o.
+	* options.h (arch_t): Boolify.
+	(options_t): Add s_<VAR> fields.
+	* options.c (comma_list_to_array): New function
+	* options.def (-syms): Remove.
+	(-graph*): New options.
+	* load-flash.c (load_symbol_string_table): Call
+	set_elf_string_table, finish_elf_string_table.
+	(load_to_flash): Provide emty string table if the executable does
+	not have one.
+	(decode_opcode): Set have_syscall[] on SYSCALL.
+	* logging.c: Factor out performance meters to perf.c.  Factor out
+	symbol handling to graph.c.
+	* logging.h: Same.  And add include guards.
+	(graph.h, perf.h): New includes.
+	* perf.c: New file.
+	* perf.h: New file.
+	* graph.h: New file.
+	* graph.c: New file.
+
+2014-10-29  Georg-Johann Lay  <avr@gjlay.de>
+
+	Remove dead -[no-]ticks option.
+
+	* options.def (ticks): Remove.
+	* options.c (USAGE): Adjust.
+
+2014-10-29  Georg-Johann Lay  <avr@gjlay.de>
+
+	Avoid unspecified order when reading GPRs.
+
+	* avrtest.c (CPSE, AND, OR, EOR, CP, CPC, SUB, SBC): Apply get_reg
+	for first input operand first.
+
+2014-10-26  Georg-Johann Lay  <avr@gjlay.de>
+
+	Fix PERF_TAG_[P]FMT_FLOAT.  Tidy perf_instruction.
+
+	* avrtest.h (PERF_TAG_FMT_FLOAT, PERF_TAG_PFMT_FLOAT): Fix.
+	* testavr.h (AR_SP): Remove and use...
+	(pSP): ...this instead.
+	* avrtest.c: Same.
+	* logging.h (perf_t.cmd): Turn from array to scalar.
+	* logginc.c: Adjust.
+	(perf_instruction, do_log_config, perf_verbose_start): Tidy.
+	(perf_start, perf_stat, perf_dump, perf_stop): Tidy.
+
+2014-10-25  Georg-Johann Lay  <avr@gjlay.de>
+
+	Fix options.o <- testavr.h dependency.
+
+	* Makefile (options.o): Depend on testavr.h.
+	* options.c (usage): Fix LEAVE_USAGE.
+
+2014-10-25  Georg-Johann Lay  <avr@gjlay.de>
+
+	Remove last remains of "magic" paradigm.
+
+	* testavr.h (magic_t): Rename to sfr_t.
+	(named_port): Rename to named_sfr.
+	* avrtest.c (data_read_magic_byte, data_write_magic_byte): Remove.
+	Adjust callers to use data_read_byte / data_write_byte instead.
+
+2014-10-25  Georg-Johann Lay  <avr@gjlay.de>
+
+	Switch from TICKS_PORT to SYSCALL.
+
+	* avrtest.h (TICKS_PORT): Remove define.
+	(TICKS_IS_CYCLES, TICKS_IS_INSNS, TICKS_IS_PRAND, TICKS_IS_RAND)
+	(TICKS_RESET, TICKS_RESET_ALL): Remove.
+	(avrtest_syscall_8): Remove.
+	(DEF_SYSCALL1_0, DEF_SYSCALL1_1, AT_INLINE): New.
+	(avrtest_cycles, avrtest_insns, avrtest_rand, avrtest_prand)
+	(avrtest_reset_cycles, avrtest_reset_insns, avrtest_reset_prand)
+	(avrtest_reset_all): New.
+	* testavr.h (AR_TICKS_PORT, log_get_ticks): Remove.
+	* avrtest.c (named_port) [TICKS_PORT]: Remove entries.
+	(log_cpu_address) [AR_TICKS_PORT]: Remove.
+	(func_SYSCALL) [8]: Don't handle.
+	* logging.c (do_ticks_cmd): Rewrite.
+	(s_ti, log_get_ticks, do_get_ticks): Remove.
+	(do_syscall) [8]: Don't handle.
+
+2014-10-23  Georg-Johann Lay  <avr@gjlay.de>
+
+	Fail on undefined pre-decrement / post-increment Operations.
+
+	* avr-opcode.def (UNDEF): New.
+	* load_flash.c (decode_opcode) [X+, Y+, Z+, -X, -Y, -Z]: Map
+	instructions with these addressing modes to ID_UNDEF if register
+	overlaps it.
+	* avrtest.c (func_UNDEF): New.
+	* logging.c (mnemonic): Move to...
+	* testavr.h (opcode_t.mnemonic): ... here.
+
+2014-10-22  Georg-Johann Lay  <avr@gjlay.de>
+
+	Support PERF_TAG_S16, PERF_TAG_S32.
+
+	* avrtest.h (PERF_TAG_S16, PERF_TAG_S32): New.
+	(PERF_TAG_FMT_S16, PERF_TAG_FMT_S32): New.
+	(PERF_TAG_PFMT_S16, PERF_TAG_PFMT_S32): New.
+	* logging.c (do_perf_tag_cmd): Handle PERF_TAG_S16_CMD,
+	PERF_TAG_S32_CMD.
+
+2014-10-20  Georg-Johann Lay  <avr@gjlay.de>
+
+	BUGFIX: Wrong SBRC / SBRS / SBIC / SBIS / CPSE skip offset
+	        introduced 2014-10-11 SVN r157.
+
+	* load-flash.c (mask_LDS_STS): Fix mask.
+	* BUGS: New file.
+
+2014-10-19  Georg-Johann Lay  <avr@gjlay.de>
+
+	Implement __vector_default to call abort.
+
+	* dejagnuboards/exit.c (__vector_default): New, call abort.
+
+2014-10-19  Georg-Johann Lay  <avr@gjlay.de>
+
+	Use SYSCALLs instead of magic ports.
+
+	* dejagnuboards/exit.c: Adjust to syscall interfaces.
+	* avrtest.h: Adjust to syscall.
+	(ABORT_PORT_ADDR, LOG_PORT_ADDR, EXIT_PORT_ADDR, STDIN_PORT_ADDR)
+	(STDOUT_PORT_ADDR): Remove.
+	(avrtest_abort, avrtest_exit, avrtest_putchar, avrtest_getchar)
+	(avrtest_ticks) [!IN_AVRTEST]: New user functions.
+	* avr-opcode.def (SYSCALL): New.
+	* load-flash.c (decode_opcode) [CPSE]: Map special skips to SYSCALLs.
+
+	* logging.c (log_set_func_symbol): Ignore weird addresses.
+	(log_add_instr) [maybe_used]: Adjust to SYSCALL.
+	(do_log_dump, do_ticks_cmd): Dito.
+	(perf_verbose_start, perf_stat, perf_stop, perf_dump)
+	(perf_instruction): Adjust to new CMDs.
+	(log_init): Don't set RAM[0xffff].
+	(get_raw_value): Rename to...
+	(get_r20_value): ...this.
+	(flush_ticks_port, log_get_ticks, s_ti[], do_get_ticks): New.
+	(do_log_port_cmd): Removed and diffuse code to...
+	(do_log_config, do_perf_cmd, do_perf_tag_cmd): ... new functions.
+	(do_syscall): New. Use them.
+	(putchar_escaped, do_put_args): Move to...
+	* options.c: ...here.
+	* avrtest.c (invalid_opcode, get_word_reg_raw): New.
+	(data_read_magic_port, data_write_magic_port): Remove.
+	(data_read_magic_byte): Just handle TICKS_PORT.
+	(named_port) [LOG_PORT, STDOUT_PORT, STDIN_PORT, EXIT_PORT]
+	[ABORT_PORT]: Remove.
+	(do_argc_argv, do_stdin, do_stdout, do_abort, do_exit): New.
+	(func_SYSCALL): New, use them.
+	* testavr.h (do_log_port_cmd, flush_ticks_port): Remove.
+	(do_syscall, log_get_ticks, put_argv): New.
+
+2014-10-15  Georg-Johann Lay  <avr@gjlay.de>
+
+	Make ID = 0 bad_pc instruction.
+
+	* avr-opcodes.def (_bad_pc, DES): New.
+	(_null, _last__fast): Remove.
+	* avrtest.c (func__bad_pc, func_DES): New.
+	(do_step): ID = 0 is no more a special case.
+	(do_fast): Remove.
+	(func_ILLEGAL): Read bad opcode from flash.
+
+2014-10-15  Georg-Johann Lay  <avr@gjlay.de>
+
+	Make clean-up.  Use "+r" to constrain regs in exit.c.
+
+	* logging.c (perf_instruction): Read SP via log_cpu_address.
+	* avrtest.c (log_cpu_address): More AR_* address ranges.
+	(log_data_write_byte, addr_TICKS_PORT, log_data_read_byte)
+	(addr_SP, log_put_word_reg, log_data_write_word): Remove.
+	* testavr.h: Same.
+	(AR_REG, AR_RAM, AR_FLASH, AR_EEPROM, AR_SP, AR_TICKS_PORT): New.
+
+2014-10-15  Georg-Johann Lay  <avr@gjlay.de>
+
+	Support BREAK and PERF_START_CALL.
+
+	* avr-opcode.def (BREAK): New.
+	* avrtest.c (func_BREAK): New.
+	* avrtest.h (PERF_START_CALL): New.
+	* logging.h (perfs_t.call_only): New.
+	* loggin.g.c (print_tag): Tidy.
+	(do_log_port_cmd, perf_start, perf_stop, perf_instructions):
+	Handle PERF_START_CALL.
+
+2014-10-14  Georg-Johann Lay  <avr@gjlay.de>
+
+	Postpone writing EXIT_PORT from exit to .fini1.
+
+	* dejagnuboards/exit.c (putchar_exit_c, init_exit_c, file_exit_c)
+	(init_args): Rename...
+	(avrtest_fputc, avrtest_init_stream, avrtest_output_stream)
+	(avrtest_init_argc_argv): ...to these.
+	(avrtest_output_stream): Use FDEV_SETUP_STREAM to initialize.
+	(avrtest_exit_code): New variable.
+	(exit): Set it.  And jump to _exit.
+	(avrtest_fini1): New .fini1 function.
+
+2014-10-13  Georg-Johann Lay  <avr@gjlay.de>
+
+	Load EEPROM, -v option (verbose), more TICKS_PORT.
+
+	* optiond.def (-v): New option.
+	* load-flash.c (load_elf): Load .eeprom section to eeprom.
+	[-v]: Print PHDR.
+	(decode_flash): Only decode from program code_start to code_end.
+	* testavr.h (MAX_EEPROM_SIZE): New define.
+	(program_t, program, flush_ticks_port): New type and protos.
+	* logging.c (ticks_port_t, ticks_port): New type and variable.
+	(flush_ticks_port, do_ticks_cmd): New functions.
+	(do_log_dump): Handle TICKS_*_CMD.
+	* avrtest.h (TICKS_IS_RAND_CMD, TICKS_RESET_CMD, TICKS_IS_CYCLES_CMD)
+	(TICKS_IS_INSNS_CMD, TICKS_IS_PRAND_CMD, TICKS_RESET_ALL_CMD)
+	(TICKS_IS_RAND, TICKS_RESET, TICKS_IS_CYCLES, TICKS_IS_INSNS)
+	(TICKS_IS_PRAND, TICKS_RESET_ALL): New macros.
+	* avrtest.c (max_instr_count, instr_count, program_size)
+	(program_cycles, program_entry_point): Move data to...
+	(program): ...this new structure.
+	(cpu_eeprom[]): New...
+	(main): ...pass it to load_to_flash.  Pass time to log_init.
+	(data_read_magic_port): Move TICKS_PORT handling to flush_ticks_port.
+
+2014-10-11  Georg-Johann Lay  <avr@gjlay.de>
+
+	Tidy up leave().  Pre-decode 32-bit skips.  Don't strip programs.
+
+	* load-flash.c (decode_opcode) [CPSE, SBRC, SBRS, SBIC, SBIS]:
+	Map to 32-bit variant as needed.
+	[BRBS/BRBC]: Precompute jump offset.
+	* avr-opcode.def (CPSE1, SBIC1, SBIS1, SBRC1, SBRS1): Remove.
+	* logging.c (log_patch_mnemo): Dito.
+	* avrtest.c (exit_status_t): New type.
+	(exit_status[]): New.
+	(exit_status_text): Remove.
+	(leave): Tidy up.  Factor out runtime statistics to...
+	(print_runtime): ...this new function.
+	(skip_instruction_on_condition): Don't handle size==0.
+	(branch_on_sreg_condition): Simplify delta computation.
+	(func_CPSE/SBIC/SBIS/SBRC/SBRS): Pass 1 as words to skip.
+	(func_CPSE1/SBIC1/SBIS1/SBRC1/SBRS1): Remove.
+	(Makefile): Don't strip executables.
+
+2014-10-10  Georg-Johann Lay  <avr@gjlay.de>
+
+	Refactoring and minor tweaks.
+
+	* avr-insn.def: Move to...
+	* avr-opcode.def: ...here.  And rename AVR_INSN to AVR_OPCODE.
+	* load-flash.c (decode_opcode):  Filter opcodes.
+	[ID_RJMP, ID_RCALL]: Pre-compute jump offset (op2).
+	* testavr.h (decoded_op): Rename to decoded_t.
+	Rename .oper1/2 to .op1/2.
+	(opcode_func_array): Rename to opcodes.
+	(opcode_t.mnemo): Move to...
+	* logging.c (mnemonic): ...this new array.
+	* gen-flag-tables.c (main): Make output depend on argv[1].
+	(TB_NOTHING, TB_EXTERN, TB_STATIC, TB_GOBAL): New.
+	(table_start, table_end, table_add): Depend code generation on them.
+	* flag-tables.c: Regenerate.
+	* flag-tables.h: New generated file.
+	* Makefile (avr-insn.def): Rename to: avr-opcode.def.
+	(flag-tables.o): New rule to build it.
+	(XOBJ): Add flag-tables.o.
+	(avrtest*.o): Depend on flag-tables.o.
+	(flag-tables): Also generate flag-tables.h.
+	* avrtest.c (flag-tables.h): #include instead of flag-tables.c.
+	(func_ASR): Minor tweak.
+	(func_RCALL, func_RJMP): Use pre-computed jump offset.
+	(xmega_atomic): Add magic_p and mnemo arguments.
+	[ISA_XMEGA]: Abort.
+	(func_XCH/LAC/LAS/LAT): Less magic, pass mnemo, don't depend
+	on is_xmega.
+
+2014-10-09  Georg-Johann Lay  <avr@gjlay.de>
+
+	Handle "RCALL ." and unknown function names.
+
+	* logging.c (log_add_instr): Pass decoded_op* to set_call_depth.
+	(set_call_depth): Adjust interface. Set unknown function names
+	to "?".  [ID_RCALL]: Handle offset = 0.
+
+2014-10-09  Georg-Johann Lay  <avr@gjlay.de>
+
+	More elaborate exit stati with quiet operation (-q).
+	Show usage with -h or --help.
+
+	* README (-q): Document exit stati.
+	* avrtest.c (exit_status_text): Initialize EXIT_STATUS_FILE,
+	EXIT_STATUS_MEMORY with "ABORTED".
+	(is_avrtest_log): New const.
+	(leave): Don't print runtime statistics if failing.
+	[options.do_quiet]: Return exit status 10, 11, 12, 13, 42 as
+	documented in README.
+	(get_mem): New function.
+	* load-flash.c (load_elf): Leave with EXIT_STATUS_FILE if something
+	is wrong with the executable file.
+	(load_symbol_string_table): Same.  And call it only if is_avrtest_log.
+	Use get_mem to allocate heap.
+	* options.c (USAGE): Document -h, --help.
+	(usage) [fmt=NULL]: Show usage for --help etc. and exit 0.
+	(parse_args): Silently support ?, -?, /?, -h, --help to show usage.
+	* options.def: Reorder.
+	* testavr.h: Include stdlib.h.
+	(is_avrtest_log, get_mem): New protos.
+	(EXIT_STATUS_FILE, EXIT_STATUS_MEMORY): New enum.
+
+2014-10-09  Georg-Johann Lay  <avr@gjlay.de>
+
+	Display function symbols from ELF when logging.
+	New option -no-syms to switch that off.
+
+	* options.def (-[no-]syms): New option.
+	* testavr.h (program_size, io_base, log_set_func_symbol)
+	(load_to_flash, decode_flash, set_function_symbol): New protos.
+	* avr-insn.def (xmega): New pseudo insn.
+	(XCH, LAS, LAC, LAT): Don't depend on ISA_XMEGA.
+	* logging.c (func_symbol[]): New static array.
+	(LEN_SYMBOL_STACK): New macro.
+	(log_set_func_symbol, func_name): New functions.
+	(perf_instruction): Factor out code to track call depth to...
+	(set_call_depth): ...this new function.
+	(log_add_instr): Use it.
+	(log_init): Set RAM[MAX_RAM_SIZE-1] to 1.
+	(log_dump_line): Typo.
+	* avrtest.c (io_base): New const.
+	(program_size): Make global.
+	(set_function_symbol): New function.
+	(xmega_atomic, func_XCH/LAC/LAS/LAT): Don't depend on ISA_XMEGA.
+	Abort if !is_xmega.
+	(main): Adjust calls to load_to_flash and decode_flash.
+	(Elf32_Half, Elf32_Word, Elf32_Addr, uint32_t Elf32_Off)
+	(Elf32_Ehdr ,Elf32_Phdr, get_elf32_half, get_elf32_word)
+	(avr_op_16_index, avr_op_6_index, avr_op_74_index)
+	(load_elf, load_to_flash, decoder_operand_masks,)
+	(decoder_operand_masks,decode_opcode, decode_flash):
+	Move to...
+	* load-flash.c: ...this new file.
+	* Makefile (DEPS_LOAD_FLASH): New.
+	(XOBJ): Add load-flash.o.
+	(avrtest*.o): Depend on load-flash.o.
+	(load-flash.o): New rule.
+
+2014-10-07  Georg-Johann Lay  <avr@gjlay.de>
+
+	Support entry point from ELF.
+
+	* avrtest.h (program_entry_point): New.
+	* avrtest.c (program_entry_point): New variable.
+	(load_elf) [!-e ENTRY]: Set it and cpu_PC from ELF entry point.
+	(leave): Show entry-point if non-zero.
+	(options.c) [-e]: More sanity checking, set program_entry_point.
+
+2014-10-06  Georg-Johann Lay  <avr@gjlay.de>
+
+	Tweak skip instructions.
+
+	* avr-insn.def: (CPSE, SBRC, SBRS, SBIC, SBIS):
+	Add instruction variants for known skip of 1 resp. 2 words.
+	* testavr.h (decoded_op.data_index): Rename to .id.
+	(log_stat_guesses): Remove.
+	* avrtest.c (leave): Handle varargs consistently.
+	(bad_PC): New function.
+	(func_EICALL/EIJMP, pop_PC, do_step): Use it.
+	(skip_instruction_on_condition): Add size argument.
+	Patch skip on the fly as skip offset is known.
+	(func_CPSE/SBRC/SBRS/SBIC/SBIS): New variants to skip = 1,2 words.
+	* logging.c (log_patch_mnemo): Handle new variants of: CPSE, SBRC,
+	SBRS, SBIC, SBIS.
+	(perf_function, log_dump_line): Clean up alog.stat stuff.
+	(log_stat_guesses): Remove.
+	* logging.h (alog_t.stat): Remove.
+
+2014-10-06  Georg-Johann Lay  <avr@gjlay.de>
+
+	Improve logging and support performance-meters.
+
+	* logging.h: New file.
+	* Makefile: Rename LOG_DUMP to AVRTEST_LOG.
+	(logging.o): Depend on logging.h.
+	* avrtest.c: Rename to LOG_DUMP to AVRTEST_LOG.
+	Use log_append instead of log_add_reg_mov, log_add_immed.
+	(leave) [-runtime]: Call log_stat_guesses.
+	(execute): Call log_init.
+	(named_port[]): New variable.
+	(log_cpu_address, byte log_data_read_byte): New functions.
+	(avrtest.h):New macros to support logging.
+	* logging.c: Rename LOG_DUMP to AVRTEST_LOG.
+	(stdarg.h, inttypes.h, logging.h): Include them.
+	(log_data, cur_log_pos, log_during_perf, log_count, log_count_val)
+	Move to...
+	(alog): ...this new variable.
+	(log_add_data): Replace by...
+	(log_append): ...this new function.
+	(log_put_bit): Rename to log_patch_mnemo.
+	(log_add_immed, log_add_reg_mov, buf): Remove
+	(log_add_data_mov): Use named_port to pretty print magic ports.
+	(decode_avr_float, read_string, get_raw_value, do_log_dump)
+	(log_init, log_stat_guesses): New functions.
+	(print_tag, print_tags, minmax_update_double, perf_verbose_start)
+	(perf_stat, perf_start, perf_stop, perf_dump): New functions.
+	(perf_instruction): Use them.
+	(do_log_cmd): Rename to do_log_port_cmd.  Handle LOG_TAG_PERF.
+	(log_dump_line, log_add_instr): Try to avoid writing alog.data[]
+	if logging that instruction won't be logged.
+	* testavr.h (magic_t): New type.
+	(log_init, log_append, log_stat_guesses, log_data_read_byte)
+	(log_cpu_address): New prototypes.
+	(log_add_bit, log_add_immed, log_add_reg_mov, do_log_cmd): Remove.
+
+2014-09-30  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c (do_subtraction_8): Reduce register pressure.
+	(func_CP/CPI/CPC/NEG/SUB/SUBI/SBC/SBCI): Adjust interface.
+	(func_SBCI_SUBI): Remove.
+
+2014-09-30  Georg-Johann Lay  <avr@gjlay.de>
+
+	* AUTHORS: New file.
+
+2014-09-30  Georg-Johann Lay  <avr@gjlay.de>
+
+	* logging.c (s_SREG): Make global.
+	(log_add_flag_read): New function.
+	(branch_on_sreg_condition): Use it.
+	(data_write_magic_port) <leave>: Add exit value to reason.
+
+2014-09-30  Georg-Johann Lay  <avr@gjlay.de>
+
+	* dejagnuboargs/exit.c (xargc, xargv): Clean up.
+	(init_exit_c:file_exit_c): Initialize statically.
+
+2014-09-30  Georg-Johann Lay  <avr@gjlay.de>
+
+	Support -q for quiet operation.
+
+	* README (-q): Document it.
+	* options.def (q): New entry.
+	* avrtest.c (stdarg.h): Include it.
+	(qprintf): New function.
+	(leave): Use it as needed, pass exit status from program on -q.
+	Turn to varargs function.
+	* logging.c (putchar_escaped): New function.
+	(do_put_args): Use it.  And use qprintf as needed.
+	(do_log_cmd, perf_instruction, log_dump_line): Use qprintf as needed.
+	* options.c (USAGE): Add -q.
+	(usage): Turn to varargs function.
+	(get_valid_number): New function.
+	(parse_args) [-e,-m]: Use it.
+	* testavr.h (qprintf): New prototype.
+	(EXIT_STATUS_USAGE, EXIT_STATUS_FATAL): New exit stati.
+
+2014-09-29  Georg-Johann Lay  <avr@gjlay.de>
+
+	Support -args, -no-log, LOG_PORT.
+
+	* logging.c: New file.
+	* testavr.h: New file.
+	* options.h: New file.
+	* options.c: New file.
+	* options.def: New file.
+	* Makefile: Tidy up.
+	(logging.o, options.o): New rules to build them.
+	* avrtest.c (is_xmega): New const.
+	(INLINE, NOINLINE, NORETURN, FASTCALL, OP_FUNC_TYPE)
+	(EXIT_STATUS_EXIT, EXIT_STATUS_ABORTED, EXIT_STATUS_TIMEOUT)
+	(MAX_RAM_SIZE, MAX_FLASH_SIZE, PC_VALID_MASK, ID_*)
+	(byte, word, dword, decoded_op, opcode_t): Move to testavr.h.
+	(log_add_instr, log_add_bit, log_add_immed, log_add_data_mov)
+	(log_add_reg_mov, log_dump_line, mask_to_bit, log_put_bit):
+	Move to logging.c.
+	(arch_t): Move to options.h
+	(arch, usage, parse_args): Move to options.c
+	(flag_have_*): Replace by options.do_*.
+	(program_name): Use options.program_name instead.
+	(flash_addr_mask): Use arch.flash_addr_mask instead.
+	(addr_SREG, addr_SPH, addr_SPL, addr_EIND, addr_RAMPZ): New.
+	(log_data_read_SP, log_data_write_byte, log_put_word_reg)
+	(log_data_write_word): New functions.
+	(cpu_data[MAX_RAM_SIZE-1]) <LOG_DUMP>: Set to 1.
+	* avrtest.h (LOG_PORT_ADDR, LOG_PORT, LOG_SET): New macros.
+	(LOG_CMD, LOG_NUM, LOG_STOP_NUM, LOG_START_NUM)
+	(LOG_PERF_NUM, LOG_GET_ARGS_NUM, PERF_STOP, PERF_START, PERF_MEAN)
+	(PERF_DUMP, PERF_CMD, PERF_N, PERF_ALL) <IN_AVRTEST>: New macros.
+	(LOG_SET_CMD, LOG_STOP_CMD, LOG_START_CMD, LOG_PERF_CMD)
+	(LOG_GET_ARGS_CMD, PERF_STOP_VAL, PERF_START_VAL, PERF_MEAN_VAL)
+	(PERF_DUMP_VAL, LOG_SET, LOG_START, LOG_STOP, LOG_PERF)
+	(LOG_GET_ARGS, PERF_STOP, PERF_START, PERF_MEAN, PERF_DUMP)
+	(PERF_STOP_ALL, PERF_START_ALL, PERF_MEAN_ALL, PERF_DUMP_ALL)
+	<!IN_AVRTEST>: New macros.
+	* dejagnuboargs/exit.c (init_args): New function in .init8.
+
+2014-09-21  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c (do_subtraction_8, FUT_ADD_SUB_INDEX): Minor tweak.
+	(rotate_right): Minor tweak.
+	(func_ASR, func_ROR): Adjust.
+
+2014-09-20  Georg-Johann Lay  <avr@gjlay.de>
+
+	Remove magic action from PUSH, POP, CALL, ... to speed up.
+
+	* avrtest.c (data_read_byte_raw, data_write_byte_raw)
+	(data_read_byte, data_write_byte): Don't do magic.
+	(data_read_magic_byte, data_write_magic_byte): New functions.
+	(IN, OUT, CBI, SBI, SBIC, SBIS, LD*, ST*): Use them.
+	(load_indirect, store_indirect, xmega_atomic): Dito.
+
+2014-09-20  Georg-Johann Lay  <avr@gjlay.de>
+
+	Pretty-print SREG, flags and bits.
+
+	* sreg.h (s_SREG): New variable.
+
+	* avr-insn.def (BCLR, BLD, BRBC, BRBS, BSET, BST, CBI, SBI)
+	(SBIS, SBIC, SBRC, SBRS) [NAME]: Use '*' as placeholder for
+	bits printed by log_put_bit.
+
+	* avrtest.c (exit_status_text): Move up.
+	(mask_to_bit, log_put_bit): New functions.
+	(log_add_instr): Use them to fix '*' in NAMEs of: BCLR,
+	BLD, BRBC, BRBS, BSET, BST, CBI, SBI, SBIS, SBIC, SBRC, SBRS.
+	Change argument to decoded_op*.
+	(do_step): Pass decoded_op* to log_add_instr.
+	(log_add_immed): New function.
+	(func_ANDI, func_ORI, func_CPI, func_SBCI_SUBI, func_ADIW)
+	(func_ADIW): Call it.
+	(update_flags, do_subtraction_8): Use data_read_byte_raw for SREG.
+	(data_read_byte, data_write_byte): Use special format for SREG.
+	(log_add_data_mov): Pretty print EIND, RAMPZ.  Print SREG
+	as 'CZNVSHTI' instead of as hex value.
+
+2014-09-20  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avr-insn.def (CLR, LSL, ROL, TST): New shortcuts.
+	* avrtest.c (decode_opcode): Decode them.
+	(func_CLR, func_LSL, func_ROL, func_TST): New to implement them.
+	(do_shift_8): New function.
+
+2014-09-20  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avr-insn.def (NAME): Remove redundant r's.
+
+2014-09-19  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c (NOINLINE, NORETURN): New defines.
+	(leave): Use them.
+	(opcode_t): Remove .hreadable if !LOG_DUMP.
+	(AVR_INSN): Adjust.
+	(FASTCALL): New define.
+	(OP_FUNC_TYPE): Use it.
+
+2014-09-19  Georg-Johann Lay  <avr@gjlay.de>
+
+	* Makefile (flag-tables): New phony to build flag-tables.c.
+	(flag-tables.c): Remove rule to build.
+	(exe): Rename to EXEEXT resp. BUILD_EXEEXT.
+	(AVRGCC): Rename to CC_FOR_AVR.
+	(CFLAGS_FOR_HOST, CFLAGS_FOR_AVR): New.
+	(CC_FOR_BUILD, CFLAGS_FOR_BUILD): New variables.
+	(gen-flag-tables): Use them instead of CC, CFLAGS.
+	(all-xmega, exit-xmega): Remove dead rules.
+
+	Revert to 2014-09-18 trunk r129: Undo:
+
+	* gen-flag-tables.c (main): Accept argv[1] as input file name.
+
+2014-09-18  Georg-Johann Lay  <avr@gjlay.de>
+
+	* gen-flag-tables.c (main): Accept argv[1] as input file name.
+
+2014-09-18  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c (leave): Typo.  Also print program_size in decimal.
+	(do_fast): Remove dead code.
+	* avr-insn.def: Typo.
+
+2014-09-17  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c (func_MOV, func_MOVW, func_LDI): Make inline.
+
+2014-09-17  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c (t_load): New variable.
+	(parse_args) [flag_have_runtime]: Set it.
+	(leave) [flag_have_runtime]: Print info about load phase.
+
+2014-09-17  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c (t_decode, t_execute): New variables.
+	(main) [flag_have_runtime]: Set them.
+	(leave) [flag_have_runtime]: Print info about decode and execute phase.
+	(time_sub): Change interface to return sec, us and ms.
+
+2014-09-17  Georg-Johann Lay  <avr@gjlay.de>
+
+	* Makefile (CFLAGS): Resurrect -O3.
+	* avr-insns.def (LDI, MOV, MOVW): Move before...
+	(LAST_FAST): This new insn.
+	* avrtest.c (do_fast): New function.
+	(do_step): Use it for IDs < ID_LAST_FAST.
+	(func_LAST_FAST): New function.
+	(leave): Fix missing 0s in %ld.
+
+2014-09-17  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c (data_read_byte_raw): Factor out magic ports to...
+	(data_read_magic_port): ...this new function.
+	(data_write_byte_raw): Factor out magic ports to...
+	(data_write_magic_port): ...this new function.
+	(do_step): Move TICKS_PORT handling to data_read_magic_port.
+	* avrtest.h (FIRST_MAGIC_IN_PORT, LAST_MAGIC_IN_PORT)
+	(FIRST_MAGIC_OUT_PORT, LAST_MAGIC_OUT_PORT): New defines.
+
+2014-09-17  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c (execute): Merge two loops to one.  Make inline.
+
+2014-09-15  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c (leave) [-runtime]: Show instructions per ms.
+	(instr_count): New variable.
+
+2014-09-15  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c (-no-ticks): Remove option and replace by...
+	(-ticks): ...this one with reversed logic.
+
+2014-09-15  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c (avr_op_*): Rename to func_*.
+
+2014-09-15  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c (avr_op_index_*): Rename to ID_*.
+
+2014-09-15  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c (CX): New define depending on xmega.
+	* avr-insns.def (CBI, EICALL, ICALL, LDS, PUSH, RCALL, SBI)
+	(SBIC, SBIS): Use CX to adjust instruction timing for xmega.
+
+2014-09-15  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c (opcode_data): Rename to opcode_t.  Move .size and
+	.cycles to the end of the structure.
+	(opcode_func_array): Adjust initialization.
+
+2014-09-15  Georg-Johann Lay  <avr@gjlay.de>
+
+	* Makefile: Build xmega executables and exit*.o per default.
+	Strip all executables.
+	(CFLAGS): Use -Os instead of -O3.
+	(exit-xmega, all-xmega): Clean up.
+
+2014-09-15  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c (sys/time.h): New include.
+	(flag_have_runtime, t_start): New variables.
+	(time_sub): New function.
+	(leave) [flag_have_runtime]: Print runtime.
+	(parse_args) [-runtime]: New option.
+	(usage): Document it.
+	(main): Set t_start.
+
+2014-09-15  Georg-Johann Lay  <avr@gjlay.de>
+
+	* COPYING: New file.
+	* avrtest.c: Update GPL copyright years.
+	* avr-insn.def: Update GPL copyright years.
+	* gen-flag-tables.c: Update GPL copyright years.
+	(main): Transfer GPL to flag-tables.c.
+	* flag-tables.c: Regenerate.
+
+2014-09-15  Georg-Johann Lay  <avr@gjlay.de>
+
+	Implement a ticks counter for timing measurements.
+
+	* avrtest.h (TICKS_PORT_ADDR, TICKS_PORT): New defines.
+	* avrtest.c (flag_have_ticks, ticker_locked): New variables.
+	(parse_args) [-no-ticks]: New option to unset flag_have_ticks.
+	(usage): Document it.
+	(do_step) [flag_have_ticks]: Update cpu_data[TICKS_PORT] to
+	program_cycles.
+	(data_read_byte_raw): Increment ticker_locked if reading from
+	TICKS_PORT[0..2].
+
+2014-09-15  Georg-Johann Lay  <avr@gjlay.de>
+
+	* Makefile (CFLAGS): Add -std=c99.
+	(WARN): Add -pedantic.
+	* avrtest.c: Use more C99.
+	* gen-flag-tables.c: Same.
+
+2014-09-15  Georg-Johann Lay  <avr@gjlay.de>
+
+	* .svnignore: New file.
+
+2014-09-15  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c (opcode_func_array, enum avr_op_index_): Factor out
+	instruction table to, and include...
+	* avr-insn.def: ...this new file.
+	* Makefile (DEPS): Depend on avr-insn.def.
+
+2014-09-12  Georg-Johann Lay  <avr@gjlay.de>
+
+	* Makefile (%-xmega.exe): Fix command to build avrtest-xmega.exe.
+
+2014-09-08  Georg-Johann Lay  <avr@gjlay.de>
+
+	Support -e ADDRESS to set program entry point.
+
+	* avrtest.c (parse_args) [cpu_PC]: Set according to...
+	[-e ADDRESS]: ...this new command line option.
+	(usage): Document it.
+	(execute) [cpu_PC]: Don't set to 0.
+
+2014-09-08  Georg-Johann Lay  <avr@gjlay.de>
+
+	* Makefile (exit-xmega): Depend on exit-atxmega128a1.o.
+
+2014-09-08  Georg-Johann Lay  <avr@gjlay.de>
+
+	* gen-flag-tables.c (table_add): Print values as hex.
+	* flag-tables.c: Regenerate.
+
+2012-12-15  Georg-Johann Lay  <avr@gjlay.de>
+
+	Don't build XMEGA stuff per default.
+
+	* Makefile: Use .exe executable suffix if build OS is windows.
+	(all): Only depend on: avrtest, exit.
+	(all-xmega, exit-xmega, clean-exit, exit): New rules.
+	README: Explain how to use other avr-gcc and build XMEGA stuff.
+
+2012-06-04  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c: Be more resolute with inlining.
+
+2012-06-04  Georg-Johann Lay  <avr@gjlay.de>
+
+	* Makefile: Add rules to build Win32 executables.
+
+2012-06-04  Georg-Johann Lay  <avr@gjlay.de>
+
+	* README: Update new repositiry URL and avrtest-xmega description.
+
+2012-06-04  Georg-Johann Lay  <avr@gjlay.de>
+
+	* flag-tables.c: New generated file.
+	* avrtest.c: Include it. Include sreg.h.
+	(main): Don't call init_flag_update_tables.
+	(flag_update_table_add8): Remove.
+	(flag_update_table_sub8): Remove.
+	(flag_update_table_ror8): Remove.
+	(flag_update_table_inc): Remove.
+	(flag_update_table_dec): Remove.
+	(flag_update_table_logical): Remove.
+	(FUT_ADD8_RES): Move to...
+	(FUT_ADD8_V2_80): Move to...
+	(FUT_ADD8_V1_80): Move to...
+	(FUT_ADD8_V2_08): Move to...
+	(FUT_ADD8_V1_08): Move to...
+	(FUT_SUB8_RES): Move to...
+	(FUT_SUB8_V2_80): Move to...
+	(FUT_SUB8_V1_80): Move to...
+	(FUT_SUB8_V2_08): Move to...
+	(FUT_SUB8_V1_08): Move to...
+	(update_zns_flags): Move to...
+	(init_flag_update_tables): Move to...
+
+	* gen-flag-tables.c: ...this new file.
+	* sreg.h: New file.
+
+	* Makefile (avrtest.c): Depend on flag-tables.c and sreg.h
+	(flag-tables.c): New rule.
+	(gen-flag-tables): New rule.
+	(clean): rm gen-flag-tables, *.i. *.s
+
+2012-05-24  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c (avr_op_index_XCH, avr_op_index_LAS, avr_op_index_LAC,
+	avr_op_index_LAT): New enum values.
+	(xmega_atomic): New function.
+	(avr_op_XCH): New function.
+	(avr_op_LAS, avr_op_LAC, avr_op_LAT): New functions.
+	(opcode_func_array): Add XMEGA opcodes: XCH, LAS, LAC, LAT.
+	(decode_opcode): Handle 0x9204, 0x9205, 0x9206, 0x9207.
+
+2012-03-20  Georg-Johann Lay  <avr@gjlay.de>
+
+	* Makefile (all): Add exit-atmega103.o.
+	* dejagnuboards/atmega103-sim.exp: New file.
+
+2012-03-12  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avr51-flash1.x: New file.
+	* dejagnuboards/atmega128-sim.exp (ldflags): Pass path where
+	avrtest is located in -L so that custom ld script like above
+	needed by some test cases can be found.
+	* dejagnuboards/atxmega128-sim.exp (ldflags): Ditto.
+
+2012-03-07  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c (rotate_right): Non-jump formulation for arithmetic.
+	(avr_op_RJMP, avr_op_RCALL, avr_op_BLD): Ditto.
+	(do_subtraction_8): Ditto.
+	(do_multiply): Ditto.
+	(branch_on_sreg_condition): Ditto.
+	(avr_op_SBIW, avr_op_ADIW): Ditto.
+
+2012-02-29  Georg-Johann Lay  <avr@gjlay.de>
+
+	* dejagnuboards/exit.c: Use GNU style.
+	(init_exit_c): Define as constructor instead of .init8.
+
+2012-02-24  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest (arch): Turn from pointer into object to reduce levels
+	of indirection.
+	(log_add_instr): Ditto.
+	(push_PC, pop_PC): Ditto.
+	(avr_op_ICALL, avr_op_RET, avr_op_CALL, avr_op_RCALL): Ditto.
+	(parse_args): Ditto.
+	(pop_PC, avr_op_EICALL, avr_op_EIJMP): Sanity check PC.
+	(PC_VALID_MASK): New macro.
+	(skip_instruction_on_condition): Use it to constrain PC.
+	(branch_on_sreg_condition): Ditto.
+	(avr_op_RJMP, avr_op_RCALL): Ditto.
+
+2012-02-24  Georg-Johann Lay  <avr@gjlay.de>
+
+	* dejagnuboards/atxmega128-sim.exp (ldflags): add
+	--defsym=__stack=0x1fff
+
+2012-02-23  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c (avr_op_EICALL, avr_op_EIJMP): Use get_word_reg to read Z.
+
+2012-02-23  Georg-Johann Lay  <avr@gjlay.de>
+
+	* README: Add note for avrtest-xmega.
+
+	* avrtest.c: Add support for XMEGA.
+	* avrtest.h: Ditto.
+	* Makefile: Add rules to make avrtest-xmega, avrtest-xmega_log,
+	and exit-atxmega128a3.o.
+
+	* dejagnuboards/atxmega128-sim.exp: New file.
+
+2012-02-23  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c: More GNU coding rule fixess.
+
+2012-02-23  Georg-Johann Lay  <avr@gjlay.de>
+
+	* avrtest.c: Indent according to GNU coding rules.
+
+2011-12-07  Georg-Johann Lay  <avr@gjlay.de>
+
+	* dejagnuboards/atmega128-sim.exp (no_long_long): Don't set to 1
+	so that long long run tests are performed.
+
+2011-07-06  Georg-Johann Lay  <avr@gjlay.de>
+
+	* dejagnuboards/atmega128-sim.exp (keeps_null_pointer_checks):
+	Set to 1.
+
+2011-06-09  Georg-Johann Lay  <avr@gjlay.de>
+
+	* README: New file.
+
+2011-06-08  Georg-Johann Lay  <avr@gjlay.de>
+
+	* Makefile: Rewritten.
+	* avrtest.h: New file.
+	* avrtest.c: Include "avrtest.h"
+	(flag_have_stdin, flag_have_stdout): New variables.
+	(pargs_args): Unset them on "-no-stdin" resp. "-no-stdout".
+	(data_read_byte_raw): Use flag_have_stdin.
+	(data_write_byte_raw): Use flag_have_stdout.
+	(usage): Document new command line options -no-stdin and
+	-no-stdout.
+	* dejagnuboards/exit.c: Reworked using "avrtest.h".
+	* dejagnuboards/atmega128-sim.exp: Link against exit-atmega128.o.
+	Use -no-stdin for avrtest.
+
+2008-06-26  Tristan Gingold  <gingold@adacore.com>
+
+	* avrtest.c: Add support for multiple architecture.  Add command-line
+	option -mmcu=ARCH to select the architecture.  Help updated.
+	Add support for avr6 instructions: eijmp, eicall.
+
+2008-06-22  Andy Hutchinson   <hutchinsonandy@aim.com>
+
+	* exit.c (exit): Make no return. (abort): Likewise.
+	(putchar): Touch argument to prevent unused warning.
+
+	* atmega128-sim.exp: Remove redundant file missing check.
+	Increase RAM and stack size.
+	Set Compat options to restrict compatibility tests and optimize to
+	reduce size.
+	Extend simulation time limit.
+
+2008-06-04  Eric B. Weddington  <eric.weddington@atmel.com>
+
+	* avrtest.c: Add include of <stdint.h>. This allows it to be built
+	with MinGW again.
+
+2008-06-04  Eric B. Weddington  <eric.weddington@atmel.com>
+
+	* dejagnuboards/atmega128-sim.exp: Specify command line instruction
+	limit by adding -m switch. Suggestion from Andy Hutchinson.
+
+2008-05-21  Tristan Gingold  <gingold@adacore.com>
+
+	* avrtest.c: Add ELF support. Add command-line option (-d) to
+	initialize SRAM from .data (for ELF program). Add command-line
+	option (-m) to limit the number of instructions executed.
+
+------------------------------------------------------------------------
+
+2008-02-13  Paulo Marques  <pmarques@grupopie.com>
+
+	* avrtest.c: Use 'flag update tables' to speed up flag updates
+	after arithmetic / logic opcode execution.
+
+2008-02-02  Paulo Marques  <pmarques@grupopie.com>
+
+	* avrtest.c: Give more information at program exit.
+	Cleanup a lot of #ifdef's.  Change the timeout from cycles to
+	instructions, because the simulator runs slightly faster this way.
+	Add a barrier for the stack at 0x60, that makes avrtest abort with
+	stack overflow when crossed.
+
+2008-01-30  Paulo Marques  <pmarques@grupopie.com>
+
+	* avrtest.c: Show the instruction in human readable form in the
+	execution log.
+
+2008-01-29  Paulo Marques  <pmarques@grupopie.com>
+
+	* avrtest.c: Predecode flash using tables to speed up execution.
+
+2008-01-26  Eric B. Weddington  <eric.weddington@atmel.com>
+
+	Initial import of avrtest into CVS.
+
+	* avrtest.c: New file.
+	* Makefile: New file.
+	* .dejagnurc: New file.
+	* dejagnuboards/exit.c: New file.
+	* dejagnuboards/atmega128-sim.exp: New file.
+
+------------------------------------------------------------------------
+
