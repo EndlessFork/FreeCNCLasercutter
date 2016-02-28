@@ -1,3 +1,5 @@
+#!/bin/env python
+
 import sys
 import time
 import serial
@@ -41,8 +43,9 @@ class Sender(object):
     def sendfile(self, file):
         # file object, not filename!
         lines = file.readlines()
-        for l in lines:
-            print "\rline %d of %d:",l.strip(),
+        for idx,l in enumerate(lines):
+            print "\rline %d of %d" %(idx, len(lines)),
+            sys.stdout.flush()
             self.sendline(l)
 
     def sendnamedfile(self, filename):
