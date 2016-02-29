@@ -405,7 +405,7 @@ void buffer_arc(uint32_t R, StepperPos fromx, StepperPos fromy,
     b->arc.y = fromy;
     b->arc.err = err;
     b->arc.r = R;
-    b->base_ticks = 40404; // may be multiplied with 1..1.414 for OCR1A, depending on position on arc
+    //~ b->base_ticks = 40404; // may be multiplied with 1..1.414 for OCR1A, depending on position on arc
     b->job = ((ccw) ? STEPPER_ARC_CCW : STEPPER_ARC_CW) | get_octant(fromx, fromy, ccw);
 
     // XXX: OPTIMIZE this! mul may overflow!

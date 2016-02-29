@@ -1,6 +1,7 @@
 G21
 G28
 M649 S100 L5 P10
+F900
 
 (inner shape)
 G0 X19 Y23

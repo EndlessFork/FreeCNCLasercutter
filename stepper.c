@@ -87,6 +87,7 @@ bool move_kernel(void) {
         return FALSE; // axis mask empty -> finished
 
     // stupid ramp, but faster than staying at 244Hz. clamp to at most 8Khz.
+
     // 'mantissa' bits. the more, the slower is the accel/deccel. 6 is good
     #define MAGIC   6
     #define MAGIC2   (16-MAGIC+1)*(1<<MAGIC)
@@ -117,7 +118,7 @@ bool move_kernel(void) {
         }
     }
     LOG_X16(tmp);
-    OCR1A = max(2000U, tmp);
+    OCR1A = min(s->base_ticks, max(2000U, tmp));
     LOG_X16(OCR1A);LOG_STRING("ST: new OCR1A Value\n");
     return (--s->steps_to_go != 0);
 }
@@ -1011,15 +1012,17 @@ ISR(TIMER1_COMPA_vect) {
 
 
         LOG_STRING("New Job: properties:\n");
-        LOG_STRING("Laser: steps:");LOG_U24(s->laser.steps);LOG_NEWLINE;
-        LOG_STRING("Laser:   ctr:");LOG_S24(s->laser.ctr);LOG_NEWLINE;
-        LOG_STRING("Laser:  mode:");LOG_U8(s->laser.mode);LOG_NEWLINE;
-        LOG_STRING("Laser:  bits:");LOG_U8(s->laser.modulation+1);LOG_NEWLINE;
+        LOG_STRING("Laser:  steps:");LOG_U24(s->laser.steps);LOG_NEWLINE;
+        LOG_STRING("Laser:    ctr:");LOG_S24(s->laser.ctr);LOG_NEWLINE;
+        LOG_STRING("Laser:   mode:");LOG_U8(s->laser.mode);LOG_NEWLINE;
+        LOG_STRING("Laser:   bits:");LOG_U8(s->laser.modulation+1);LOG_NEWLINE;
+        LOG_STRING("Stepper:ticks:");LOG_X16(s->base_ticks);LOG_NEWLINE;
 
         if (s->laser.mode == LASER_OFF)
             laser_fire(0);
         OCR1A = s->base_ticks;
     }
+    LOG_STRING("OCR1A is:");LOG_X16(OCR1A);LOG_NEWLINE;
 }
 
 
