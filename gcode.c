@@ -764,6 +764,9 @@ void process_command() {
         tmp_extruder = integers[LETTER_T];
         // do something? parse laser settings and store as tool T ?
 #endif
+    } else if (codes_seen & LETTER_V_MASK) { // request Version info
+        cmd_print(PSTR(VERSION));
+        LOG_STRING(VERSION "\n");
     } else {
         // ignore other commands
     }

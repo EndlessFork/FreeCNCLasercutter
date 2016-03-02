@@ -3,7 +3,8 @@
 
 //~ #define DEBUG
 
-
+// include git version as VERSION define
+#include "Version"
 
 #include <inttypes.h>
 #include <stdlib.h>

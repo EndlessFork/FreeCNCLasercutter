@@ -15,7 +15,6 @@ state_t STATE;
 int32_t referenced_position[NUM_AXIS]; // position after referencing is done (before setting refpos)
 int32_t lost_ref_steps[NUM_AXIS];       // difference between last referencing and current -> lost_steps
 
-
 state_t *state_ptr;
 
 

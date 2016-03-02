@@ -412,7 +412,7 @@ ALL_ASFLAGS = -mmcu=$(MCU) -I. -x assembler-with-cpp $(ASFLAGS)
 
 
 # Default target.
-all: begin gccversion avrtest_log sizebefore build sizeafter end
+all: begin gccversion Version avrtest_log sizebefore build sizeafter end
 
 # Change the build target to build a HEX file or a library.
 build: elf hex eep lss sym
@@ -638,7 +638,7 @@ $(shell mkdir $(OBJDIR) 2>/dev/null)
 # Listing of phony targets.
 .PHONY : all begin finish end sizebefore sizeafter gccversion \
 build elf hex eep lss sym coff extcoff \
-clean clean_list program debug gdb-config
+clean clean_list program debug gdb-config force
 
 
 #backup:
@@ -668,7 +668,11 @@ reset:
 avrtest_log:
 	make -C avrtest all
 
-debug:
+debug: all
 	$(CC) -mmcu=$(MCU) $(ALL_CFLAGS) $(LD_FLAGS) -DDEBUG -o main_debug.elf *.c
 	$(OBJDUMP) -h -S -z main_debug.elf > main_debug.lss
+
+# include Git version
+Version: force
+	./.git_version.sh | cmp -s - $@ || ./.git_version.sh > $@
 
