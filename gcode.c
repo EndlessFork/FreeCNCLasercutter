@@ -483,6 +483,8 @@ void process_command() {
                     LOG_STRING("G: No Homing Axes specified\n");
                 }
             }
+                stepper_drain_buffer();
+                G.relative_mode = FALSE;
                 break;
 
             case 90: // G90 - absolute coordinates

@@ -1031,6 +1031,8 @@ void stepper_drain_buffer(void) {
         idle('S');
     while (STATE.job != STEPPER_IDLE)
         idle('s');
+    // re-init RasterData Buffer as well
+    LASER_RASTERDATA_init();
 }
 
 // read one component of the stepper position (in steps)
