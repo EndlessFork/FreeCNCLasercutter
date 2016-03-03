@@ -559,7 +559,7 @@ parser_result_t process_char(char c) {
 void parser_init(void) {
     char c, *p = PSTR("F300\nG28\n");
     state = EXPECT_FIRST_LETTER;
-    while (c=pgm_read_byte(p++))
+    while ((c=pgm_read_byte(p++)))
         process_char(c);
     LOG_STRING("P: init done\n");
 }

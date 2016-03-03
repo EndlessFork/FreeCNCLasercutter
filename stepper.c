@@ -33,7 +33,7 @@ state_t *state_ptr;
 bool move_kernel(void) {
     register state_t *s asm("r28") = state_ptr;
     uint8_t flag;
-    uint16_t tmp;
+    uint16_t tmp, maxcode;
 
     LOG_STRING("Stepper: MOVE\n");
     // first part: step the necessary axes
@@ -89,16 +89,32 @@ bool move_kernel(void) {
 
     // 'mantissa' bits. the more, the slower is the accel/deccel. 6 is good
     #define MAGIC   6
+    // highest code which fits into 16bits
     #define MAGIC2   (16-MAGIC+1)*(1<<MAGIC)
-    tmp = min(s->steps_to_go, 1 + s->steps_total - s->steps_to_go);
-    if (tmp <= MAGIC2)
-        tmp = MAGIC2 - tmp;
+
+    // figure out highest code which (after decoding) is not bigger than s->base_ticks
+    if (s->base_ticks < (1<<MAGIC)) {
+        maxcode = s->base_ticks;
+    } else {
+        flag = 1;
+        maxcode = s->base_ticks;
+        while (maxcode >= (2<<MAGIC)) {
+            flag++;
+            maxcode >>= 1;
+        }
+        maxcode = (maxcode & ((1<<MAGIC)-1)) | (flag << MAGIC);
+    }
+
+    // obtain code to be used
+    tmp = min(s->steps_to_go - 1, s->steps_total - s->steps_to_go);
+    if (tmp <= maxcode)
+        tmp = maxcode - tmp;
     else
         tmp = 0;
 
-    LOG_STRING("MOVE_OCR1A_CALC");LOG_X16(tmp);
+    // decode code to uint16
     // extract exponent (as flag)
-    flag = tmp >> MAGIC;LOG_U8(flag);
+    flag = tmp >> MAGIC;
     if (flag) {
         // if no underflow, force highest bit set
         tmp |= 1 << MAGIC;
@@ -111,14 +127,13 @@ bool move_kernel(void) {
         if (tmp < 32768) {
             tmp <<= 1;
         } else {
-            // overflow
+            // overflow -> break loop
             tmp = 65535;
             break;
         }
     }
-    LOG_X16(tmp);
-    OCR1A = min(s->base_ticks, max(2000U, tmp));
-    LOG_X16(OCR1A);LOG_STRING("ST: new OCR1A Value\n");
+    OCR1A = max(2000U, min(s->base_ticks, tmp));
+    LOG_STRING("ST: new OCR1A Value:");LOG_X16(OCR1A);LOG_NEWLINE;
     return (--s->steps_to_go != 0);
 }
 

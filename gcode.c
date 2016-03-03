@@ -248,7 +248,7 @@ void process_command() {
 
     if (numbers_got & LETTER_F_MASK) { // always handle F first
         if (numbers[LETTER_F] > 0)
-            G.speed = max((numbers[LETTER_F] + 30) / 60, DEFAULT_MIN_SPEED);
+            G.speed = min(max((numbers[LETTER_F] + 30) / 60, DEFAULT_MIN_SPEED), (1000000LL*8000LL)/ (int32_t)XY_AXIS_STEPS_PER_M);
             LOG_STRING("G: set_speed to um/s: ");LOG_U32(G.speed);LOG_NEWLINE;
     }
     if (numbers_got & LETTER_G_MASK) { // handle G-codes

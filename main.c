@@ -119,19 +119,19 @@ void loop(void) {
 
         CLR_PIN(RX_LED); // enable LED (active LOW)
         switch (process_char(c)) {
-            PARSER_OK :
+            case PARSER_OK :
                 // reply OK and free entries in stepper queue
                 cmd_print(PSTR("OK %d\n"), STEPPER_QUEUE_SIZE - 1 - STEPPER_QUEUE_used());
                 cmd_flush();
-            PARSER_CHECKSUM_ERROR :
+            case PARSER_CHECKSUM_ERROR :
                 // reply with resend request
                 cmd_print(PSTR("resend!\n"));
                 cmd_flush();
-            PARSER_FORMAT_ERROR :
+            case PARSER_FORMAT_ERROR :
                 // reply with error:
                 cmd_print(PSTR("FORMAT ERROR\n"));
                 cmd_flush();
-            PARSER_NEXTCHAR :
+            case PARSER_NEXTCHAR :
                 break;
         }
         SET_PIN(RX_LED); // disable LED
