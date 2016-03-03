@@ -666,9 +666,15 @@ void process_command() {
         tmp_extruder = integers[LETTER_T];
         // do something? parse laser settings and store as tool T ?
 #endif
-    } else if (codes_seen & LETTER_V_MASK) { // request Version info
+    } else if ((codes_seen == LETTER_V_MASK) && (!numbers_got)) { // 'V' - request Version info
         cmd_print(PSTR(VERSION));
         LOG_STRING(VERSION "\n");
+    } else if ((codes_seen == LETTER_P_MASK) && (!numbers_got)) { // 'P' - request single Laser Pulse
+        stepper_drain_buffer();
+        laser_fire(255);
+        laser_start_pulse_timer(laser.pulse_duration_us);
+        LOG_STRING("Single PULSE\n");
+        while (laser.laser_is_on) ;
     } else {
         // ignore other commands
     }
