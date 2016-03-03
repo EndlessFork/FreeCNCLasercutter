@@ -125,10 +125,10 @@ typedef int32_t number;
 
 typedef uint8_t mask_t;
 // en/disable parts of movement in axis_mask
-#define X_AXIS_MASK 0b0001
-#define Y_AXIS_MASK 0b0010
-#define Z_AXIS_MASK 0b0100
-#define LASER_MASK  0b1000
+#define X_AXIS_MASK ((uint8_t) 0b0001)
+#define Y_AXIS_MASK ((uint8_t) 0b0010)
+#define Z_AXIS_MASK ((uint8_t) 0b0100)
+#define LASER_MASK  ((uint8_t) 0b1000)
 
 typedef int24_t StepperPos;
 typedef uint24_t StepperCnt;

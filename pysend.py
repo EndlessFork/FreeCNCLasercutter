@@ -15,7 +15,7 @@ class Sender(object):
         self.port.flush()
         self.checkreply()
 
-    def checkreply(self):
+    def checkreply(self, line=''):
         # XXX: use regexes here !
         r = ''
         while '\n' not in r:
@@ -30,6 +30,9 @@ class Sender(object):
                 self.queuefree = int(queuefree)
             except Exception:
                 pass
+        if 'resend!' in r:
+            if line:
+                self.sendline(line)
 
     def sendline(self, line):
         while self.queuefree <= 1: # safety: leave 1 open
@@ -38,7 +41,7 @@ class Sender(object):
         self.port.write(line.strip())
         self.port.write('\n')
         self.port.flush()
-        self.checkreply()
+        self.checkreply(line.strip())
 
     def sendfile(self, file):
         # file object, not filename!

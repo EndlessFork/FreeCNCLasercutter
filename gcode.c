@@ -52,6 +52,10 @@
 // M2   - (exit sim mode normally) END_OF_PROGRAM
 // M3    - enable Tool (Laser)
 // M5   - disable Tool (Laser)
+// M400 - Finish all moves
+// M649 - Setup properties for Laser Rastering
+//
+// planned to implement:
 // M20  - List SD card
 // M21  - Init SD card
 // M22  - Release SD card
@@ -76,13 +80,11 @@
 // M204 - Set default accel: S normal moves T laser moves (M204 S3000 T7000) im mm/sec^2
 // M205 - advanced settings:  minimum travel G.speed S=while printing T=travel only,  B=minimum segment time X= maximum xy jerk, Z=maximum Z jerk, E=maximum E jerk
 // M206 - set additional homeing offset
-// M400 - Finish all moves
 // M500 - stores paramters in EEPROM
 // M501 - reads parameters from EEPROM (if you need reset them after you changed them temporarily).
 // M502 - reverts to the default "factory settings".  You still need to store them in EEPROM afterwards if you want to.
 // M503 - print the current settings (from memory not from eeprom)
 // M540 - Use S[0|1] to enable or disable the stop SD card print on endstop hit (requires ABORT_ON_ENDSTOP_HIT_FEATURE_ENABLED)
-// M649 - Setup properties for Laser Rastering
 // M999 - Restart after being stopped by error
 
 
@@ -507,7 +509,7 @@ void process_command() {
 
         } // case (integers[LETTER_G])
     } else if ((numbers_got & LETTER_M_MASK) && !(integers[LETTER_M] & 0xffff0000)) { // handle M-codes second
-        switch ((uint16_t) integers[LETTER_M])    {
+        switch ((uint16_t) integers[LETTER_M]) {
             case 0: // M0 - undefined
                 LOG_STRING("G: M command without number!!!\n");
 
@@ -632,102 +634,6 @@ void process_command() {
 
             #endif //SDSUPPORT
 
-            //~ case 92: // M92 - set steps per unit  !!!BLOCKING!!!
-                //~ stepper_drain_buffer();
-                //~ if (codes_seen & LETTER_X_MASK) Config.steps_per_unit[X_AXIS] = numbers[LETTER_X];
-                //~ if (codes_seen & LETTER_Y_MASK) Config.steps_per_unit[Y_AXIS] = numbers[LETTER_Y];
-                //~ if (codes_seen & LETTER_Z_MASK) Config.steps_per_unit[Z_AXIS] = numbers[LETTER_Z];
-                //~ break;
-
-            //~ case 115: // M115
-                //~ SERIAL_PROTOCOLPGM(MSG_M115_REPORT);
-                //~ break;
-
-            //~ case 117: // M117 display message
-                //~ starpos = (strchr(strchr_pointer + 5,'*'));
-                //~ if (starpos!=NULL)
-                    //~ *(starpos-1)='\0';
-                //~ lcd_setstatus(strchr_pointer + 5);
-                //~ break;
-
-            //~ case 114: // M114
-                //~ SERIAL_PROTOCOLPGM("X:");
-                //~ SERIAL_PROTOCOL(PL.position[X_AXIS]);
-                //~ SERIAL_PROTOCOLPGM("Y:");
-                //~ SERIAL_PROTOCOL(PL.position[Y_AXIS]);
-                //~ SERIAL_PROTOCOLPGM("Z:");
-                //~ SERIAL_PROTOCOL(PL.position[Z_AXIS]);
-                //~
-                //~ SERIAL_PROTOCOLPGM(MSG_COUNT_X);
-                //~ SERIAL_PROTOCOL(number(stepper_get_position(X_AXIS))/Config.steps_per_unit[X_AXIS]);
-                //~ SERIAL_PROTOCOLPGM("Y:");
-                //~ SERIAL_PROTOCOL(number(stepper_get_position(Y_AXIS))/Config.steps_per_unit[Y_AXIS]);
-                //~ SERIAL_PROTOCOLPGM("Z:");
-                //~ SERIAL_PROTOCOL(number(stepper_get_position(Z_AXIS))/Config.steps_per_unit[Z_AXIS]);
-                //~
-                //~ SERIAL_PROTOCOLLN("");
-                //~ break;
-
-            //~ case 119: // M119
-                //~ SERIAL_PROTOCOLLN(MSG_M119_REPORT);
-                //~ #if defined(X_MIN_PIN) && X_MIN_PIN > -1
-                //~ SERIAL_PROTOCOLPGM(MSG_X_MIN);
-                //~ SERIAL_PROTOCOLLN(((READ(X_MIN_PIN)^X_MIN_ENDSTOP_INVERTING)?MSG_ENDSTOP_HIT:MSG_ENDSTOP_OPEN));
-                //~ #endif
-                //~ #if defined(X_MAX_PIN) && X_MAX_PIN > -1
-                //~ SERIAL_PROTOCOLPGM(MSG_X_MAX);
-                //~ SERIAL_PROTOCOLLN(((READ(X_MAX_PIN)^X_MAX_ENDSTOP_INVERTING)?MSG_ENDSTOP_HIT:MSG_ENDSTOP_OPEN));
-                //~ #endif
-                //~ #if defined(Y_MIN_PIN) && Y_MIN_PIN > -1
-                //~ SERIAL_PROTOCOLPGM(MSG_Y_MIN);
-                //~ SERIAL_PROTOCOLLN(((READ(Y_MIN_PIN)^Y_MIN_ENDSTOP_INVERTING)?MSG_ENDSTOP_HIT:MSG_ENDSTOP_OPEN));
-                //~ #endif
-                //~ #if defined(Y_MAX_PIN) && Y_MAX_PIN > -1
-                //~ SERIAL_PROTOCOLPGM(MSG_Y_MAX);
-                //~ SERIAL_PROTOCOLLN(((READ(Y_MAX_PIN)^Y_MAX_ENDSTOP_INVERTING)?MSG_ENDSTOP_HIT:MSG_ENDSTOP_OPEN));
-                //~ #endif
-                //~ #if defined(Z_MIN_PIN) && Z_MIN_PIN > -1
-                //~ SERIAL_PROTOCOLPGM(MSG_Z_MIN);
-                //~ SERIAL_PROTOCOLLN(((READ(Z_MIN_PIN)^Z_MIN_ENDSTOP_INVERTING)?MSG_ENDSTOP_HIT:MSG_ENDSTOP_OPEN));
-                //~ #endif
-                //~ #if defined(Z_MAX_PIN) && Z_MAX_PIN > -1
-                //~ SERIAL_PROTOCOLPGM(MSG_Z_MAX);
-                //~ SERIAL_PROTOCOLLN(((READ(Z_MAX_PIN)^Z_MAX_ENDSTOP_INVERTING)?MSG_ENDSTOP_HIT:MSG_ENDSTOP_OPEN));
-                //~ #endif
-                //~ break;
-
-            //TODO: update for all axis, use for loop
-            //~ case 201: // M201 - set Accel in units per s^2
-                //~ if (codes_seen & LETTER_X_MASK) Config.max_accel[X_AXIS] = numbers[LETTER_X];
-                //~ if (codes_seen & LETTER_Y_MASK) Config.max_accel[Y_AXIS] = numbers[LETTER_Y];
-                //~ if (codes_seen & LETTER_Z_MASK) Config.max_accel[Z_AXIS] = numbers[LETTER_Z];
-                //~ break;
-
-            //~ case 203: // M203 max G.speed mm/sec
-                //~ if (codes_seen & LETTER_X_MASK) Config.max_G.speed[X_AXIS] = numbers[LETTER_X];
-                //~ if (codes_seen & LETTER_Y_MASK) Config.max_G.speed[Y_AXIS] = numbers[LETTER_Y];
-                //~ if (codes_seen & LETTER_Z_MASK) Config.max_G.speed[Z_AXIS] = numbers[LETTER_Z];
-                //~ break;
-//~
-            //~ case 204: // M204 - acclereration S tool moves T travel only moves
-                //~ if (codes_seen & LETTER_S_MASK) Config.tool_accel = numbers[LETTER_S] ;
-                //~ if (codes_seen & LETTER_T_MASK) Config.travel_accel = numbers[LETTER_T];
-                //~ break;
-//~
-            //~ case 205: //M205 - advanced settings:  minimum travel G.speed S=while printing T=travel only, X=maximum X jerk, Y=maximum Y jerk, Z=maximum Z jerk
-                //~ if (codes_seen & LETTER_S_MASK) Config.tool_G.speed = numbers[LETTER_S];
-                //~ if (codes_seen & LETTER_T_MASK) Config.travel_G.speed = numbers[LETTER_T];
-                //~ if (codes_seen & LETTER_X_MASK) Config.jerk[X_AXIS] = numbers[LETTER_X];
-                //~ if (codes_seen & LETTER_Y_MASK) Config.jerk[Y_AXIS] = numbers[LETTER_Y];
-                //~ if (codes_seen & LETTER_Z_MASK) Config.jerk[Z_AXIS] = numbers[LETTER_Z];
-                //~ break;
-
-            //~ case 206: // M206 - additional homeing offset
-                //~ if (codes_seen & LETTER_X_MASK) offset[X_AXIS] = numbers[LETTER_X];
-                //~ if (codes_seen & LETTER_Y_MASK) offset[Y_AXIS] = numbers[LETTER_Y];
-                //~ if (codes_seen & LETTER_Z_MASK) offset[Z_AXIS] = numbers[LETTER_Z];
-                //~ break;
-
             case 400: // M400 finish all moves
                 stepper_drain_buffer();
                 break;
@@ -748,12 +654,6 @@ void process_command() {
                 //~ Config_PrintSettings();
                 //~ break;
 
-            //~ #ifdef ABORT_ON_ENDSTOP_HIT_FEATURE_ENABLED
-            //~ case 540:
-                //~ if (codes_seen & LETTER_S_MASK) abort_on_endstop_hit = integers[LETTER_S] > 0;
-                //~ break;
-            //~ #endif
-
             case 649: // M649 set laser options
                 handle_laser_opts();
                 break;
@@ -771,6 +671,5 @@ void process_command() {
         // ignore other commands
     }
 
-    //~ ClearToSend();
 }
 

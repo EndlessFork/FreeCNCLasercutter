@@ -118,16 +118,21 @@ void loop(void) {
         // process_char calls process_command, once a command is complete...
 
         CLR_PIN(RX_LED); // enable LED (active LOW)
-        if (process_char(c)) {
-            if (c=='\n') {
+        switch (process_char(c)) {
+            PARSER_OK :
                 // reply OK and free entries in stepper queue
                 cmd_print(PSTR("OK %d\n"), STEPPER_QUEUE_SIZE - 1 - STEPPER_QUEUE_used());
                 cmd_flush();
-            }
-        } else {
-            // reply Error
-                cmd_print(PSTR("ERROR\n"));
+            PARSER_CHECKSUM_ERROR :
+                // reply with resend request
+                cmd_print(PSTR("resend!\n"));
                 cmd_flush();
+            PARSER_FORMAT_ERROR :
+                // reply with error:
+                cmd_print(PSTR("FORMAT ERROR\n"));
+                cmd_flush();
+            PARSER_NEXTCHAR :
+                break;
         }
         SET_PIN(RX_LED); // disable LED
     }

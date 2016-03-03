@@ -1,5 +1,8 @@
 ; full line comments
 
+; test checksums
+G28*77
+
 ; rounded square
 G0 X5 Y0 Z0 ; partial comment
 M649 S13.7 L2 P5 B2 C1(short comments DO NOT NEST!)
