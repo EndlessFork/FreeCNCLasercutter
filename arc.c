@@ -60,237 +60,241 @@ static uint32_t num_steps;
 octant_t get_octant(int32_t x, int32_t y, bool ccw) {
     if (ccw) { //CCW
         if ((x > 0) && (y >= 0)) {
-            if (x > y)
-                return 0;
-            else
-                return 1;
+            return (x > y) ? STEPPER_ARC_CCW_OCT1 : STEPPER_ARC_CCW_OCT2;
         } else if ((y > 0) && (x <= 0)) {
-            if (y > -x)
-                return 2;
-            else
-                return 3;
+            return (y > -x) ? STEPPER_ARC_CCW_OCT3 : STEPPER_ARC_CCW_OCT4;
         } else if ((x<0) && (y <= 0)) {
-            if (x < y)
-                return 4;
-            else
-                return 5;
+            return (x < y) ? STEPPER_ARC_CCW_OCT5 : STEPPER_ARC_CCW_OCT6;
         } else if ((y < 0) && (x >= 0)) {
-            if (y < -x)
-                return 6;
-            else
-                return 7;
+            return (y < -x) ? STEPPER_ARC_CCW_OCT7 : STEPPER_ARC_CCW_OCT8;
         }
     } else { //CW
         if ((x > 0) && (y >= 0)) {
-            if (x > y)
-                return 8;
-            else
-                return 9;
+            return (x > y) ? STEPPER_ARC_CW_OCT1 : STEPPER_ARC_CW_OCT2;
         } else if ((y > 0) && (x <= 0)) {
-            if (y > -x)
-                return 10;
-            else
-                return 11;
+            return (y > -x) ? STEPPER_ARC_CW_OCT3 : STEPPER_ARC_CW_OCT4;
         } else if ((x<0) && (y <= 0)) {
-            if (x < y)
-                return 12;
-            else
-                return 13;
+            return (x < y) ? STEPPER_ARC_CW_OCT5 : STEPPER_ARC_CW_OCT6;
         } else if ((y < 0) && (x >= 0)) {
-            if (y < -x)
-                return 14;
-            else
-                return 15;
+            return (y < -x) ? STEPPER_ARC_CW_OCT7 : STEPPER_ARC_CW_OCT8;
         }
     }
     return 0xff; // BAD VALUE
 }
 
 
-// helpers for kernel
-#define KERNEL_STEP_X_POS {                                     \
-        /* would STEP the stepper_x in positive direction */    \
-        x++; dx += 2; err -= dx-1; }
-
-#define KERNEL_STEP_X_NEG {                                     \
-        err += dx-1; dx -= 2; x--; }                            \
-        /* would STEP the stepper_x in negative direction */
-
-#define KERNEL_STEP_Y_POS {                                     \
-        /* would STEP the stepper_y in positive direction */    \
-        y++; dy += 2; err -= dy-1; }
-
-#define KERNEL_STEP_Y_NEG {                                     \
-        err += dy-1; dy -= 2; y--; }                            \
-        /* would STEP the stepper_y in negative direction */
 
 // returns ARC_KERNEL_NO_HIT until the final point is reached, or num_steps gets zero
 // works directly on the static vars above!!! INIT correctly !!!
 uint8_t kernel(void) {
+    uint8_t flags = 0;
 
-    switch (octant & 0x0F) {
+    switch (octant) {
     // CCW octants
-    case 0: // octant 1: x > 0, y >= 0, x > y
+    case STEPPER_ARC_CCW_OCT1:
+            // octant 1: x > 0, y >= 0, x > y
             // always y+, sometimes x-
             if (err <= dy - x)
-                KERNEL_STEP_X_NEG;
-            KERNEL_STEP_Y_POS;
+                flags |= KERNEL_FLAG_X_NEG;
+            flags |= KERNEL_FLAG_Y_POS;
 
             if (y >= x)
-                octant ++;
+                octant = STEPPER_ARC_CCW_OCT2;
             break;
 
-    case 1: // octant 2: x > 0, y > 0, x <= y
+    case STEPPER_ARC_CCW_OCT2:
+            // octant 2: x > 0, y > 0, x <= y
             // always x-, sometimes y+
             if (err > y - dx)
-                KERNEL_STEP_Y_POS;
-            KERNEL_STEP_X_NEG;
+                flags |= KERNEL_FLAG_Y_POS;
+            flags |= KERNEL_FLAG_X_NEG;
 
             if (x <= 0)
-                octant ++;
+                octant = STEPPER_ARC_CCW_OCT3;
             break;
 
-    case 2: // octant 3: x <= 0, y > 0, -x <= y
+    case STEPPER_ARC_CCW_OCT3:
+            // octant 3: x <= 0, y > 0, -x <= y
             // always x-, sometimes y-
             if (err <= -(dx + y))
-                KERNEL_STEP_Y_NEG;
-            KERNEL_STEP_X_NEG;
+                flags |= KERNEL_FLAG_Y_NEG;
+            flags |= KERNEL_FLAG_X_NEG;
 
             if (x <= -y)
-                octant ++;
+                octant = STEPPER_ARC_CCW_OCT4;
             break;
 
-    case 3: // octant 4: x < 0, y > 0, -x > y
+    case STEPPER_ARC_CCW_OCT4:
+            // octant 4: x < 0, y > 0, -x > y
             // always y-, sometimes x-
             if (err > -(dy + x))
-                KERNEL_STEP_X_NEG;
-            KERNEL_STEP_Y_NEG;
+                flags |= KERNEL_FLAG_X_NEG;
+            flags |= KERNEL_FLAG_Y_NEG;
 
             if (y <= 0)
-                octant ++;
+                octant = STEPPER_ARC_CCW_OCT5;
             break;
 
-    case 4: // octant 5: x < 0, y <= 0, -x > -y
+    case STEPPER_ARC_CCW_OCT5:
+            // octant 5: x < 0, y <= 0, -x > -y
             // always y-, sometimes x+
             if (err <= x - dy)
-                KERNEL_STEP_X_POS;
-            KERNEL_STEP_Y_NEG;
+                flags |= KERNEL_FLAG_X_POS;
+            flags |= KERNEL_FLAG_Y_NEG;
 
             if (x >= y)
-                octant ++;
+                octant = STEPPER_ARC_CCW_OCT6;
             break;
 
-    case 5: // octant 6: x < 0, y < 0, -x <= -y
+    case STEPPER_ARC_CCW_OCT6:
+            // octant 6: x < 0, y < 0, -x <= -y
             // always x+, sometimes y-
             if (err > dx - y)
-                KERNEL_STEP_Y_NEG;
-            KERNEL_STEP_X_POS;
+                flags |= KERNEL_FLAG_Y_NEG;
+            flags |= KERNEL_FLAG_X_POS;
 
             if (x >= 0)
-                octant ++;
+                octant = STEPPER_ARC_CCW_OCT7;
             break;
 
-    case 6: // octant 7: x >= 0, y < 0, x <= -y
+    case STEPPER_ARC_CCW_OCT7:
+            // octant 7: x >= 0, y < 0, x <= -y
             // always x+, sometimes y+
             if (err <= dx + y)
-                KERNEL_STEP_Y_POS;
-            KERNEL_STEP_X_POS;
+                flags |= KERNEL_FLAG_Y_POS;
+            flags |= KERNEL_FLAG_X_POS;
 
             if (x >= -y)
-                octant ++;
+                octant = STEPPER_ARC_CCW_OCT8;
             break;
 
-    case 7: // octant 8: x > 0, y < 0, x > -y
+    case STEPPER_ARC_CCW_OCT8:
+            // octant 8: x > 0, y < 0, x > -y
             // always y+, sometimes x+
             if (err > x + dy)
-                KERNEL_STEP_X_POS;
-            KERNEL_STEP_Y_POS;
+                flags |= KERNEL_FLAG_X_POS;
+            flags |= KERNEL_FLAG_Y_POS;
 
             if (y >= 0)
-                octant = 0;
+                octant = STEPPER_ARC_CCW_OCT1;
             break;
 
     // CW octants
-    case 8: // octant 1: x > 0, y >= 0, x > y
+    case STEPPER_ARC_CW_OCT1:
+            // octant 1: x > 0, y >= 0, x > y
             // always y-, sometimes x+
             if (err > -dy + x)
-                KERNEL_STEP_X_POS;
-            KERNEL_STEP_Y_NEG;
+                flags |= KERNEL_FLAG_X_POS;
+            flags |= KERNEL_FLAG_Y_NEG;
 
             if (y <= 0)
-                octant = 15;
+                octant = STEPPER_ARC_CW_OCT8;
             break;
 
-    case 9: // octant 2: x > 0, y > 0, x <= y
+    case STEPPER_ARC_CW_OCT2:
+            // octant 2: x > 0, y > 0, x <= y
             // always x+, sometimes y-
             if (err <= -y + dx)
-                KERNEL_STEP_Y_NEG;
-            KERNEL_STEP_X_POS;
+                flags |= KERNEL_FLAG_Y_NEG;
+            flags |= KERNEL_FLAG_X_POS;
 
             if (y < x)
-                octant --;
+                octant = STEPPER_ARC_CW_OCT1;
             break;
 
-    case 10: // octant 3: x <= 0, y > 0, -x <= y
+    case STEPPER_ARC_CW_OCT3:
+            // octant 3: x <= 0, y > 0, -x <= y
             // always x+, sometimes y+
             if (err > dx + y)
-                KERNEL_STEP_Y_POS;
-            KERNEL_STEP_X_POS;
+                flags |= KERNEL_FLAG_Y_POS;
+            flags |= KERNEL_FLAG_X_POS;
 
             if (x >= 0)
-                octant --;
+                octant = STEPPER_ARC_CW_OCT2;
             break;
 
-    case 11: // octant 4: x < 0, y > 0, -x > y
+    case STEPPER_ARC_CW_OCT4:
+            // octant 4: x < 0, y > 0, -x > y
             // always y+, sometimes x+
             if (err <= dy + x)
-                KERNEL_STEP_X_POS;
-            KERNEL_STEP_Y_POS;
+                flags |= KERNEL_FLAG_X_POS;
+            flags |= KERNEL_FLAG_Y_POS;
 
             if (x > -y)
-                octant --;
+                octant = STEPPER_ARC_CW_OCT3;
             break;
 
-    case 12: // octant 5: x < 0, y <= 0, -x > -y
+    case STEPPER_ARC_CW_OCT5:
+            // octant 5: x < 0, y <= 0, -x > -y
             // always y+, sometimes x-
             if (err > -x + dy)
-                KERNEL_STEP_X_NEG;
-            KERNEL_STEP_Y_POS;
+                flags |= KERNEL_FLAG_X_NEG;
+            flags |= KERNEL_FLAG_Y_POS;
 
             if (y >= 0)
-                octant --;
+                octant = STEPPER_ARC_CW_OCT4;
             break;
 
-    case 13: // octant 6: x < 0, y < 0, -x <= -y
+    case STEPPER_ARC_CW_OCT6:
+            // octant 6: x < 0, y < 0, -x <= -y
             // always x-, sometimes y+
             if (err <= -dx + y)
-                KERNEL_STEP_Y_POS;
-            KERNEL_STEP_X_NEG;
+                flags |= KERNEL_FLAG_Y_POS;
+            flags |= KERNEL_FLAG_X_NEG;
 
             if (x < y)
-                octant --;
+                octant = STEPPER_ARC_CW_OCT5;
             break;
 
-    case 14: // octant 7: x >= 0, y < 0, x <= -y
+    case STEPPER_ARC_CW_OCT7:
+            // octant 7: x >= 0, y < 0, x <= -y
             // always x-, sometimes y-
             if (err > -(dx + y))
-                KERNEL_STEP_Y_NEG;
-            KERNEL_STEP_X_NEG;
+                flags |= KERNEL_FLAG_Y_NEG;
+            flags |= KERNEL_FLAG_X_NEG;
 
             if (x <= 0)
-                octant --;
+                octant = STEPPER_ARC_CW_OCT6;
             break;
 
-    case 15: // octant 8: x > 0, y < 0, x > -y
+    case STEPPER_ARC_CW_OCT8:
+            // octant 8: x > 0, y < 0, x > -y
             // always y-, sometimes x-
             if (err <= -(x + dy))
-                KERNEL_STEP_X_NEG;
-            KERNEL_STEP_Y_NEG;
+                flags |= KERNEL_FLAG_X_NEG;
+            flags |= KERNEL_FLAG_Y_NEG;
 
             if (x < -y)
-                octant --;
+                octant = STEPPER_ARC_CW_OCT7;
             break;
     };
+
+    // dont reorder !!!
+    if (flags & KERNEL_FLAG_X_NEG) {
+        /* would STEP the stepper_x in negative direction */
+        err += dx-1;
+        dx -= 2;
+        x--;
+    }
+    if (flags & KERNEL_FLAG_X_POS) {
+        x++;
+        dx += 2;
+        err -= dx-1;
+        /* would STEP the stepper_x in positive direction */
+    }
+    if (flags & KERNEL_FLAG_Y_NEG) {
+        /* would STEP the stepper_y in negative direction */
+        err += dy-1;
+        dy -= 2;
+        y--;
+    }
+    if (flags & KERNEL_FLAG_Y_POS) {
+        y++;
+        dy += 2;
+        err -= dy-1;
+        /* would STEP the stepper_y in positive direction */
+    }
+
 
     /*
     LOG_STRING("arc:kernel\n octant = ");LOG_U8(octant);
@@ -406,7 +410,7 @@ void buffer_arc(uint32_t R, StepperPos fromx, StepperPos fromy,
     b->arc.err = err;
     b->arc.r = R;
     //~ b->base_ticks = 40404; // may be multiplied with 1..1.414 for OCR1A, depending on position on arc
-    b->job = ((ccw) ? STEPPER_ARC_CCW : STEPPER_ARC_CW) | get_octant(fromx, fromy, ccw);
+    b->job = get_octant(fromx, fromy, ccw);
 
     // XXX: OPTIMIZE this! mul may overflow!
     b->laser.steps = (laser.pulses) ? laser.pulses : \

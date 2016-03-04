@@ -93,7 +93,7 @@
 // ABS_MIN_SPEED = 4359
 
 // The hardware watchdog should reset the Microcontroller disabling all outputs, in case the firmware gets stuck.
-#define USE_WATCHDOG
+//#define USE_WATCHDOG
 
 
 /***********

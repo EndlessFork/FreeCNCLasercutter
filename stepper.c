@@ -144,248 +144,294 @@ bool move_kernel(void) {
 #define USE_ARC_KERNEL
 #ifdef USE_ARC_KERNEL
 
-// helpers for arc_kernel
-#define ARC_KERNEL_STEP_X_NEG {                     \
-    /* set direction */                             \
-    SET_X_DEC;                                      \
-    /* book-keeping */                              \
-    s->arc_err += s->arc_dx-1;                      \
-    s->arc_dx -= 2;                                 \
-    s->arc_x--;                                     \
-    /* STEP the stepper_x in negative direction */  \
-    SET_X_STEP;                                     \
-    s->position[X_AXIS]--;                          \
-    LOG_STEP("X-");                                 \
-    CLR_X_STEP;                                     \
-}
-
-#define ARC_KERNEL_STEP_X_POS {                     \
-    /* set direction */                             \
-    SET_X_INC;                                      \
-    /* book-keeping */                              \
-    s->arc_x++;                                     \
-    s->arc_dx += 2;                                 \
-    s->arc_err -= s->arc_dx-1;                      \
-    /* STEP the stepper_x in positive direction */  \
-    SET_X_STEP;                                     \
-    s->position[X_AXIS]++;                          \
-    LOG_STEP("X+");                                 \
-    CLR_X_STEP;                                     \
-}
-
-#define ARC_KERNEL_STEP_Y_NEG {                     \
-    /* set direction */                             \
-    SET_Y_DEC;                                      \
-    /* book-keeping */                              \
-    s->arc_err += s->arc_dy-1;                      \
-    s->arc_dy -= 2;                                 \
-    s->arc_y--;                                     \
-    /* STEP the stepper_Y in negative direction */  \
-    SET_Y_STEP;                                     \
-    s->position[Y_AXIS]--;                          \
-    LOG_STEP("Y-");                                 \
-    CLR_Y_STEP;                                     \
-}
-
-#define ARC_KERNEL_STEP_Y_POS {                     \
-    /* set direction */                             \
-    SET_Y_INC;                                      \
-    /* book-keeping */                              \
-    s->arc_y++;                                     \
-    s->arc_dy += 2;                                 \
-    s->arc_err -= s->arc_dy-1;                      \
-    /* STEP the stepper_Y in positive direction */  \
-    SET_Y_STEP;                                     \
-    s->position[Y_AXIS]++;                          \
-    LOG_STEP("Y+");                                 \
-    CLR_Y_STEP;                                     \
-}
-
 // ONLY to be called from ISR !!!
 bool arc_kernel(void) {
     register state_t *s asm("r28") = state_ptr;
+    register uint8_t flags=0;
 
     LOG_STRING("Stepper: ARC ");LOG_U8(s->job);LOG_NEWLINE;
 
     switch (s->job) {
     // CCW octants
-    case STEPPER_ARC_CCW_OCT0:
+    case STEPPER_ARC_CCW_OCT1:
             // octant 1: x > 0, y >= 0, x > y
             // always y+, sometimes x-
-            if (s->arc_err <= s->arc_dy -s->arc_x)
-                ARC_KERNEL_STEP_X_NEG;
-            ARC_KERNEL_STEP_Y_POS;
+            if (s->arc_err <= s->arc_dy -s->arc_x) {
+                flags |= KERNEL_FLAG_X_NEG;
+                s->arc_x--;
+            }
+            s->arc_y++;
+            flags |= KERNEL_FLAG_Y_POS;
 
             if (s->arc_y >= s->arc_x)
-                s->job = STEPPER_ARC_CCW_OCT1;
-            break;
-
-    case STEPPER_ARC_CCW_OCT1:
-            // octant 2: x > 0, y > 0, x <= y
-            // always x-, sometimes y+
-            if (s->arc_err > s->arc_y - s->arc_dx)
-                ARC_KERNEL_STEP_Y_POS;
-            ARC_KERNEL_STEP_X_NEG;
-
-            if (s->arc_x <= 0)
                 s->job = STEPPER_ARC_CCW_OCT2;
             break;
 
     case STEPPER_ARC_CCW_OCT2:
-            // octant 3: x <= 0, y > 0, -x <= y
-            // always x-, sometimes y-
-            if (s->arc_err <= -(s->arc_dx + s->arc_y))
-                ARC_KERNEL_STEP_Y_NEG;
-            ARC_KERNEL_STEP_X_NEG;
+            // octant 2: x > 0, y > 0, x <= y
+            // always x-, sometimes y+
+            if (s->arc_err > s->arc_y - s->arc_dx) {
+                flags |= KERNEL_FLAG_Y_POS;
+                s->arc_y++;
+            }
+            s->arc_x--;
+            flags |= KERNEL_FLAG_X_NEG;
 
-            if (s->arc_x <= -s->arc_y)
+            if (s->arc_x <= 0)
                 s->job = STEPPER_ARC_CCW_OCT3;
             break;
 
     case STEPPER_ARC_CCW_OCT3:
-            // octant 4: x < 0, y > 0, -x > y
-            // always y-, sometimes x-
-            if (s->arc_err > -(s->arc_dy + s->arc_x))
-                ARC_KERNEL_STEP_X_NEG;
-            ARC_KERNEL_STEP_Y_NEG;
+            // octant 3: x <= 0, y > 0, -x <= y
+            // always x-, sometimes y-
+            if (s->arc_err <= -(s->arc_dx + s->arc_y)) {
+                flags |= KERNEL_FLAG_Y_NEG;
+                s->arc_y--;
+            }
+            s->arc_x--;
+            flags |= KERNEL_FLAG_X_NEG;
 
-            if (s->arc_y <= 0)
+            if (s->arc_x <= -s->arc_y)
                 s->job = STEPPER_ARC_CCW_OCT4;
             break;
 
     case STEPPER_ARC_CCW_OCT4:
-            // octant 5: x < 0, y <= 0, -x > -y
-            // always y-, sometimes x+
-            if (s->arc_err <= s->arc_x - s->arc_dy)
-                ARC_KERNEL_STEP_X_POS;
-            ARC_KERNEL_STEP_Y_NEG;
+            // octant 4: x < 0, y > 0, -x > y
+            // always y-, sometimes x-
+            if (s->arc_err > -(s->arc_dy + s->arc_x)) {
+                flags |= KERNEL_FLAG_X_NEG;
+                s->arc_x--;
+            }
+            s->arc_y--;
+            flags |= KERNEL_FLAG_Y_NEG;
 
-            if (s->arc_x >= s->arc_y)
+            if (s->arc_y <= 0)
                 s->job = STEPPER_ARC_CCW_OCT5;
             break;
 
     case STEPPER_ARC_CCW_OCT5:
-            // octant 6: x < 0, y < 0, -x <= -y
-            // always x+, sometimes y-
-            if (s->arc_err > s->arc_dx - s->arc_y)
-                ARC_KERNEL_STEP_Y_NEG;
-            ARC_KERNEL_STEP_X_POS;
+            // octant 5: x < 0, y <= 0, -x > -y
+            // always y-, sometimes x+
+            if (s->arc_err <= s->arc_x - s->arc_dy) {
+                flags |= KERNEL_FLAG_X_POS;
+                s->arc_x++;
+            }
+            s->arc_y--;
+            flags |= KERNEL_FLAG_Y_NEG;
 
-            if (s->arc_x >= 0)
+            if (s->arc_x >= s->arc_y)
                 s->job = STEPPER_ARC_CCW_OCT6;
             break;
 
     case STEPPER_ARC_CCW_OCT6:
-            // octant 7: x >= 0, y < 0, x <= -y
-            // always x+, sometimes y+
-            if (s->arc_err <= s->arc_dx + s->arc_y)
-                ARC_KERNEL_STEP_Y_POS;
-            ARC_KERNEL_STEP_X_POS;
+            // octant 6: x < 0, y < 0, -x <= -y
+            // always x+, sometimes y-
+            if (s->arc_err > s->arc_dx - s->arc_y) {
+                flags |= KERNEL_FLAG_Y_NEG;
+                s->arc_y--;
+            }
+            s->arc_x++;
+            flags |= KERNEL_FLAG_X_POS;
 
-            if (s->arc_x >= -s->arc_y)
+            if (s->arc_x >= 0)
                 s->job = STEPPER_ARC_CCW_OCT7;
             break;
 
     case STEPPER_ARC_CCW_OCT7:
+            // octant 7: x >= 0, y < 0, x <= -y
+            // always x+, sometimes y+
+            if (s->arc_err <= s->arc_dx + s->arc_y) {
+                flags |= KERNEL_FLAG_Y_POS;
+                s->arc_y++;
+            }
+            s->arc_x++;
+            flags |= KERNEL_FLAG_X_POS;
+
+            if (s->arc_x >= -s->arc_y)
+                s->job = STEPPER_ARC_CCW_OCT8;
+            break;
+
+    case STEPPER_ARC_CCW_OCT8:
             // octant 8: x > 0, y < 0, x > -y
             // always y+, sometimes x+
-            if (s->arc_err > s->arc_x + s->arc_dy)
-                ARC_KERNEL_STEP_X_POS;
-            ARC_KERNEL_STEP_Y_POS;
+            if (s->arc_err > s->arc_x + s->arc_dy) {
+                flags |= KERNEL_FLAG_X_POS;
+                s->arc_x++;
+            }
+            s->arc_y++;
+            flags |= KERNEL_FLAG_Y_POS;
 
             if (s->arc_y >= 0)
-                s->job = STEPPER_ARC_CCW_OCT0;
+                s->job = STEPPER_ARC_CCW_OCT1;
             break;
 
     // CW octants
-    case STEPPER_ARC_CW_OCT0:
+    case STEPPER_ARC_CW_OCT1:
             // octant 1: x > 0, y >= 0, x > y
             // always y-, sometimes x+
-            if (s->arc_err > -s->arc_dy + s->arc_x)
-                ARC_KERNEL_STEP_X_POS;
-            ARC_KERNEL_STEP_Y_NEG;
+            if (s->arc_err > -s->arc_dy + s->arc_x) {
+                flags |= KERNEL_FLAG_X_POS;
+                s->arc_x++;
+            }
+            s->arc_y--;
+            flags |= KERNEL_FLAG_Y_NEG;
 
             if (s->arc_y <= 0)
-                s->job = STEPPER_ARC_CW_OCT7;
-            break;
-
-    case STEPPER_ARC_CW_OCT1:
-            // octant 2: x > 0, y > 0, x <= y
-            // always x+, sometimes y-
-            if (s->arc_err <= -s->arc_y + s->arc_dx)
-                ARC_KERNEL_STEP_Y_NEG;
-            ARC_KERNEL_STEP_X_POS;
-
-            if (s->arc_y < s->arc_x)
-                s->job = STEPPER_ARC_CW_OCT0;
+                s->job = STEPPER_ARC_CW_OCT8;
             break;
 
     case STEPPER_ARC_CW_OCT2:
-            // octant 3: x <= 0, y > 0, -x <= y
-            // always x+, sometimes y+
-            if (s->arc_err > s->arc_dx + s->arc_y)
-                ARC_KERNEL_STEP_Y_POS;
-            ARC_KERNEL_STEP_X_POS;
+            // octant 2: x > 0, y > 0, x <= y
+            // always x+, sometimes y-
+            if (s->arc_err <= -s->arc_y + s->arc_dx) {
+                flags |= KERNEL_FLAG_Y_NEG;
+                s->arc_y--;
+            }
+            s->arc_x++;
+            flags |= KERNEL_FLAG_X_POS;
 
-            if (s->arc_x >= 0)
+            if (s->arc_y < s->arc_x)
                 s->job = STEPPER_ARC_CW_OCT1;
             break;
 
     case STEPPER_ARC_CW_OCT3:
-            // octant 4: x < 0, y > 0, -x > y
-            // always y+, sometimes x+
-            if (s->arc_err <= s->arc_dy + s->arc_x)
-                ARC_KERNEL_STEP_X_POS;
-            ARC_KERNEL_STEP_Y_POS;
+            // octant 3: x <= 0, y > 0, -x <= y
+            // always x+, sometimes y+
+            if (s->arc_err > s->arc_dx + s->arc_y) {
+                flags |= KERNEL_FLAG_Y_POS;
+                s->arc_y++;
+            }
+            s->arc_x++;
+            flags |= KERNEL_FLAG_X_POS;
 
-            if (s->arc_x > -s->arc_y)
+            if (s->arc_x >= 0)
                 s->job = STEPPER_ARC_CW_OCT2;
             break;
 
     case STEPPER_ARC_CW_OCT4:
-            // octant 5: x < 0, y <= 0, -x > -y
-            // always y+, sometimes x-
-            if (s->arc_err > -s->arc_x + s->arc_dy)
-                ARC_KERNEL_STEP_X_NEG;
-            ARC_KERNEL_STEP_Y_POS;
+            // octant 4: x < 0, y > 0, -x > y
+            // always y+, sometimes x+
+            if (s->arc_err <= s->arc_dy + s->arc_x) {
+                flags |= KERNEL_FLAG_X_POS;
+                s->arc_x++;
+            }
+            s->arc_y++;
+            flags |= KERNEL_FLAG_Y_POS;
 
-            if (s->arc_y >= 0)
+            if (s->arc_x > -s->arc_y)
                 s->job = STEPPER_ARC_CW_OCT3;
             break;
 
     case STEPPER_ARC_CW_OCT5:
-            // octant 6: x < 0, y < 0, -x <= -y
-            // always x-, sometimes y+
-            if (s->arc_err <= -s->arc_dx + s->arc_y)
-                ARC_KERNEL_STEP_Y_POS;
-            ARC_KERNEL_STEP_X_NEG;
+            // octant 5: x < 0, y <= 0, -x > -y
+            // always y+, sometimes x-
+            if (s->arc_err > -s->arc_x + s->arc_dy) {
+                flags |= KERNEL_FLAG_X_NEG;
+                s->arc_x--;
+            }
+            s->arc_y++;
+            flags |= KERNEL_FLAG_Y_POS;
 
-            if (s->arc_x < s->arc_y)
+            if (s->arc_y >= 0)
                 s->job = STEPPER_ARC_CW_OCT4;
             break;
 
     case STEPPER_ARC_CW_OCT6:
-            // octant 7: x >= 0, y < 0, x <= -y
-            // always x-, sometimes y-
-            if (s->arc_err > -(s->arc_dx + s->arc_y))
-                ARC_KERNEL_STEP_Y_NEG;
-            ARC_KERNEL_STEP_X_NEG;
+            // octant 6: x < 0, y < 0, -x <= -y
+            // always x-, sometimes y+
+            if (s->arc_err <= -s->arc_dx + s->arc_y) {
+                flags |= KERNEL_FLAG_Y_POS;
+                s->arc_y++;
+            }
+            s->arc_x--;
+            flags |= KERNEL_FLAG_X_NEG;
 
-            if (s->arc_x <= 0)
+            if (s->arc_x < s->arc_y)
                 s->job = STEPPER_ARC_CW_OCT5;
             break;
 
     case STEPPER_ARC_CW_OCT7:
-            // octant 8: x > 0, y < 0, x > -y
-            // always y-, sometimes x-
-            if (s->arc_err <= -(s->arc_x + s->arc_dy))
-                ARC_KERNEL_STEP_X_NEG;
-            ARC_KERNEL_STEP_Y_NEG;
+            // octant 7: x >= 0, y < 0, x <= -y
+            // always x-, sometimes y-
+            if (s->arc_err > -(s->arc_dx + s->arc_y)) {
+                flags |= KERNEL_FLAG_Y_NEG;
+                s->arc_y--;
+            }
+            s->arc_x--;
+            flags |= KERNEL_FLAG_X_NEG;
 
-            if (s->arc_x < -s->arc_y)
+            if (s->arc_x <= 0)
                 s->job = STEPPER_ARC_CW_OCT6;
             break;
+
+    case STEPPER_ARC_CW_OCT8:
+            // octant 8: x > 0, y < 0, x > -y
+            // always y-, sometimes x-
+            if (s->arc_err <= -(s->arc_x + s->arc_dy)) {
+                flags |= KERNEL_FLAG_X_NEG;
+                s->arc_x--;
+            }
+            s->arc_y--;
+            flags |= KERNEL_FLAG_Y_NEG;
+
+            if (s->arc_x < -s->arc_y)
+                s->job = STEPPER_ARC_CW_OCT7;
+            break;
     };
+    LOG_STRING("ARC:FLAGS");LOG_X8(flags);LOG_NEWLINE;
+    // evaluate flags
+    if (flags & KERNEL_FLAG_X_NEG) {
+        /* set direction */
+        SET_X_DEC;
+        /* book-keeping */
+        s->arc_err += s->arc_dx-1;
+        s->arc_dx -= 2;
+        //~ s->arc_x--;
+        /* STEP the stepper_x in negative direction */
+        SET_X_STEP;
+        s->position[X_AXIS]--;
+        LOG_STEP("X-");
+        CLR_X_STEP;
+    }
+    if (flags & KERNEL_FLAG_X_POS) {
+        /* set direction */
+        SET_X_INC;
+        /* book-keeping */
+        //~ s->arc_x++;
+        s->arc_dx += 2;
+        s->arc_err -= s->arc_dx-1;
+        /* STEP the stepper_x in positive direction */
+        SET_X_STEP;
+        s->position[X_AXIS]++;
+        LOG_STEP("X+");
+        CLR_X_STEP;
+    }
+    if (flags & KERNEL_FLAG_Y_NEG) {
+        /* set direction */
+        SET_Y_DEC;
+        /* book-keeping */
+        s->arc_err += s->arc_dy-1;
+        s->arc_dy -= 2;
+        //~ s->arc_y--;
+        /* STEP the stepper_Y in negative direction */
+        SET_Y_STEP;
+        s->position[Y_AXIS]--;
+        LOG_STEP("Y-");
+        CLR_Y_STEP;
+    }
+    if (flags & KERNEL_FLAG_Y_POS) {
+        /* set direction */
+        SET_Y_INC;
+        /* book-keeping */
+        //~ s->arc_y++;
+        s->arc_dy += 2;
+        s->arc_err -= s->arc_dy-1;
+        /* STEP the stepper_Y in positive direction */
+        SET_Y_STEP;
+        s->position[Y_AXIS]++;
+        LOG_STEP("Y+");
+        CLR_Y_STEP;
+    }
 
     // handle Z movement, if any
     if (s->axis_mask & Z_AXIS_MASK) {
@@ -489,7 +535,7 @@ bool line_kernel(void) {
     };
     LOG_POS;
 
-    OCR1A = 65535;
+    OCR1A = s->base_ticks;
 
     // fail-safe:
     if (!(s->axis_mask & 7))
@@ -648,6 +694,10 @@ bool home_kernel(void) {
 /********************
  * Main Stepper IRQ *
  ********************/
+#ifdef DEBUG
+static uint16_t laser_pulses;
+static uint16_t bytes_fetched;
+#endif
 
 //~ static dbgctr=0;
 ISR(TIMER1_COMPA_vect) {
@@ -668,8 +718,13 @@ ISR(TIMER1_COMPA_vect) {
             // switch off PULSE before setting CW
             laser_start_pulse_timer(0);
         }
-        if (s->laser.mode == LASER_OFF)
+        if (s->laser.mode == LASER_OFF) {
             laser_fire(0);
+#ifdef DEBUG
+            LOG_STRING("Clearing dbg_counters\n");
+            laser_pulses=bytes_fetched=0;
+#endif
+        }
         s->laser.last_mode = s->laser.mode;
     }
 
@@ -691,6 +746,9 @@ ISR(TIMER1_COMPA_vect) {
                         LOG_STRING("ST: Fetch now modulation data:");
                         s->laser.modbits = (s->laser.modbits << s->laser.valid_bits) | LASER_RASTERDATA_get();
                         LOG_X8(s->laser.modbits);LOG_NEWLINE;
+#ifdef DEBUG
+                        LOG_STRING("Fetched");LOG_U16(++bytes_fetched);LOG_STRING("Bytes this line\n");
+#endif
                     } else {
                         LOG_STRING("ST: Modulation data underflow\n");
                         s->laser.modbits <<= s->laser.valid_bits; // BUFFER UNDERFLOW !, fill with 0
@@ -732,6 +790,9 @@ ISR(TIMER1_COMPA_vect) {
                         break;
                 }
                 LOG_STRING("DBG: cooked modulate value");LOG_U8(modulate_value);LOG_NEWLINE;
+#ifdef DEBUG
+                LOG_STRING("Laser pulses this line:");LOG_U16(++laser_pulses);LOG_NEWLINE;
+#endif
 
                 LOG_STRING("ST: Laser: valid_bits/modbits/modulate_value:");LOG_U8(s->laser.valid_bits);LOG_X16(s->laser.modbits);LOG_X8(modulate_value);LOG_NEWLINE;
                 // modulate value is now recent. check mode to see what should be modulated.
@@ -779,7 +840,7 @@ ISR(TIMER1_COMPA_vect) {
     LOG_U8(s->job);
     switch(s->job) {
 #ifdef USE_ARC_KERNEL
-        case STEPPER_ARC_CCW_OCT0 ... STEPPER_ARC_CW_OCT7:
+        case STEPPER_ARC_CCW_OCT1 ... STEPPER_ARC_CW_OCT8:
             LOG_STRING("ARC\n");
             if (arc_kernel())
                 return;
@@ -826,6 +887,11 @@ ISR(TIMER1_COMPA_vect) {
     s->job = STEPPER_IDLE;
     s->laser.mode = LASER_OFF;
 
+#ifdef DEBUG
+            LOG_STRING("Clearing dbg_counters\n");
+            laser_pulses=bytes_fetched=0;
+#endif
+
     if (!STEPPER_QUEUE_is_empty()) {
         LOG_STRING("Stepper: fetch next job: ");
         // try to fetch next job
@@ -845,7 +911,7 @@ ISR(TIMER1_COMPA_vect) {
         LOG_U8(s->job);
         switch (s->job) {
 
-            case STEPPER_ARC_CCW_OCT0 ... STEPPER_ARC_CW_OCT7:
+            case STEPPER_ARC_CCW_OCT1 ... STEPPER_ARC_CW_OCT8:
                 LOG_STRING("ARC\n");
                 s->steps_to_go = s->steps_total = b->arc.stepcount;
                 s->arc_x = b->arc.x;

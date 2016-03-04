@@ -6,13 +6,19 @@ import base64
 
 
 MINWHITESKIP = 16
+MINLEVEL = 33
 
 class Render(object):
     #defaults
-    BPP = 3
-    PixelSize = 0.15
+    BPP = 8
+    PixelSize = 0.2
     bidir = True
     image = None
+    speed_mm_per_s = 20
+
+    @property
+    def MINLEVEL(self):
+        return max(1,MINLEVEL >> (8-self.BPP))
 
     def loadImage(self, filename):
         im = Image.open(filename)
@@ -79,11 +85,11 @@ class Render(object):
             # second round: erode lines from left and right, removing white pixels
             startx = 0
             endx = self.width - 1
-            while pixelline[startx] == 0:
+            while pixelline[startx] < self.MINLEVEL:
                 startx += 1
                 if startx > endx:
                     break
-            while pixelline[endx] == 0:
+            while pixelline[endx] < self.MINLEVEL:
                 endx -= 1
                 if startx > endx:
                     break
@@ -98,11 +104,11 @@ class Render(object):
             ll = []
             while True:
                 # find first whitespace
-                while (i < endx) and pixelline[i] != 0:
+                while (i < endx) and pixelline[i] >= self.MINLEVEL:
                     i += 1
                 # find end of run
                 j = i + 1
-                while (j < endx) and pixelline[j] == 0:
+                while (j < endx) and pixelline[j] < self.MINLEVEL:
                     j += 1
                 # check length
                 if j-i > MINWHITESKIP:
@@ -130,9 +136,9 @@ class Render(object):
                 "",
                 "G28;home",
                 "G21;mm",
-                "F600",
+                "F%d" % int(self.speed_mm_per_s * 60),
                 "G90;absolute units",
-                "M649 S100 C%d L10.240 P5 B6;B6=PulseRaster B5=CWRaster, L10.24 = long pulses (10us)" % self.BPP,
+                "M649 S100 C%d L%.3f P5 B6;B6=PulseRaster B5=CWRaster, L=pulse length" % (self.BPP, 900*self.PixelSize/self.speed_mm_per_s),
                 ""
               ]
         res.append("G0 X0 Y0 ; Adjust lower left corner here")
@@ -157,6 +163,7 @@ class Render(object):
                         res.append("G1 X%.3f Q%d" % (length*self.PixelSize, length))
                         # encode Pixeldata and append
                         res.extend(self.encodePixelData(pixels))
+                        res.append("G4")
                         # bookkeeping
                         lastx = startx+length
                         lasty = y
@@ -172,6 +179,7 @@ class Render(object):
                         res.append("G1 X%.3f Q%d" % (-length*self.PixelSize, length))
                         # encode Pixeldata and append
                         res.extend(self.encodePixelData(pixels, True))
+                        res.append("G4")
                         # bookkeeping
                         lastx = startx-length
                         lasty = y

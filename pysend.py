@@ -55,7 +55,7 @@ class Sender(object):
         with open(filename, 'r') as f:
             self.sendfile(f)
 
-s = Sender(port='/dev/ttyUSB0', baudrate=57600, xonxoff=True, timeout=0.1)
+s = Sender(port='/dev/ttyUSB0', baudrate=57600, xonxoff=True, timeout=0.02)
 
 # XXX: use argparse (or equivalent) here
 if len(sys.argv) > 1:

@@ -293,16 +293,23 @@ void process_command() {
                 PERF_STOP(3);
                 break;
 
-            case 4: // G4 dwell
+            case 4:
+                // G4 dwell
                 //LCD_MESSAGEPGM(MSG_DWELL);
-                tmp = 0;
-                if (numbers_got & LETTER_P_MASK) tmp = integers[LETTER_P]; // milliseconds to wait
-                if (numbers_got & LETTER_S_MASK) tmp += numbers[LETTER_S]; // seconds to wait
+                if (numbers_got & LETTER_P_MASK) G.delay = integers[LETTER_P]; // milliseconds to wait
+                if (numbers_got & LETTER_S_MASK) G.delay += numbers[LETTER_S]; // seconds to wait
 
                 stepper_drain_buffer();
-                tmp += millis();  // keep track of when we started waiting
-                while ((tmp - millis()) > 0 ){
+                while (LASER_RASTERDATA_can_read())
+                    LASER_RASTERDATA_pop();
+
+                tmp = millis();  // keep track of when we started waiting
+                while (G.delay) {
                     idle('D');
+                    if (tmp != millis()) {
+                        tmp = millis();
+                        G.delay--;
+                    }
                 }
                 break;
 
@@ -667,7 +674,7 @@ void process_command() {
         // do something? parse laser settings and store as tool T ?
 #endif
     } else if ((codes_seen == LETTER_V_MASK) && (!numbers_got)) { // 'V' - request Version info
-        cmd_print(PSTR(VERSION));
+        cmd_print(PSTR(":: " VERSION " :: "));
         LOG_STRING(VERSION "\n");
     } else if ((codes_seen == LETTER_P_MASK) && (!numbers_got)) { // 'P' - request single Laser Pulse
         stepper_drain_buffer();

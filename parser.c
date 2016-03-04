@@ -170,7 +170,7 @@ parser_result_t process_char(char c) {
     uint8_t b = 0;
 
     // ignore '\r'
-    if ('r' == c)
+    if ('\r' == c)
         return PARSER_NEXTCHAR;
     // at end-of-line, command is complete => call process_command
     if (('\n' == c)) {
@@ -191,9 +191,13 @@ parser_result_t process_char(char c) {
             // if Stepper queue is empty, transfer modulation data now, else later
             // XXX: move on-the-fly-while-decoding to queue to save this extra buffer
             if (STEPPER_QUEUE_is_empty()) {
-                for(b=0;b<base64_len;b++)
+                LOG_STRING("Transferring base64 bytes");LOG_U8(base64_len);LOG_NEWLINE;
+                for(b=0;b<base64_len;b++) {
+                    LOG_X8(base64_bytes[b]);
                     LASER_RASTERDATA_put(base64_bytes[b]);
-                base64_len=b=0;
+                }
+                base64_len=0;
+                LOG_NEWLINE;
             }
         }
         // check calcsum == transum
@@ -213,8 +217,12 @@ parser_result_t process_char(char c) {
             process_command();
             // if stepper queue was not empty before, transfer modulation now
             if (base64_len) {
-                for(b=0;b<base64_len;b++)
+                LOG_STRING("Transferring base64 bytes");LOG_U8(base64_len);LOG_NEWLINE;
+                for(b=0;b<base64_len;b++) {
+                    LOG_X8(base64_bytes[b]);
                     LASER_RASTERDATA_put(base64_bytes[b]);
+                }
+                LOG_NEWLINE;
             }
         }
         // re-init parser

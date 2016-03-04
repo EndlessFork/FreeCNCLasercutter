@@ -123,14 +123,17 @@ void loop(void) {
                 // reply OK and free entries in stepper queue
                 cmd_print(PSTR("OK %d\n"), STEPPER_QUEUE_SIZE - 1 - STEPPER_QUEUE_used());
                 cmd_flush();
+                break;
             case PARSER_CHECKSUM_ERROR :
                 // reply with resend request
                 cmd_print(PSTR("resend!\n"));
                 cmd_flush();
+                break;
             case PARSER_FORMAT_ERROR :
                 // reply with error:
                 cmd_print(PSTR("FORMAT ERROR\n"));
                 cmd_flush();
+                break;
             case PARSER_NEXTCHAR :
                 break;
         }
