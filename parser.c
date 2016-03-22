@@ -30,7 +30,7 @@
  */
 
 typedef enum {
-    EXPECT_FIRST_LETTER = 0,
+    INIT_PARSER = 0,
     EXPECT_LETTER,
     EXPECT_NUMBER_OR_SIGN,
     EXPECT_FIRST_DIGIT,    // must be a digit
@@ -64,7 +64,7 @@ static uint32_t current_int;
 
 
 // new style
-static parse_state state = EXPECT_FIRST_LETTER;
+static parse_state state = INIT_PARSER;
 static bool isNegative = FALSE;
 static uint8_t digits = 0; // how many digits (before any '.') are processed
 static uint8_t subdigits = 0; // how many digits (after any '.') are processed
@@ -169,11 +169,49 @@ parser_result_t process_char(char c) {
     bool isWhite = ((' ' == c)||('\t'==c));
     uint8_t b = 0;
 
+    if (state == INIT_PARSER) {
+        // re-init parser
+        last_letter = 0;
+        codes_seen = 0;
+        numbers_got = 0;
+        current_int = 0;
+        isNegative = FALSE;
+        digits = 0;
+        subdigits = 0;
+        base64_len = 0;
+        filename_len = 0;
+        calcsum = 0;
+        transum = 0;
+        checksum_chars = 0;
+        memset(numbers, 0, sizeof(numbers));
+        memset(integers, 0, sizeof(integers));
+        memset(base64_bytes, 0, sizeof(base64_bytes));
+        memset(filename, 0, sizeof(filename));
+        state = EXPECT_LETTER;
+    }
+
     // ignore '\r'
     if ('\r' == c)
         return PARSER_NEXTCHAR;
+
     // at end-of-line, command is complete => call process_command
     if (('\n' == c)) {
+        // check calcsum == transum
+        if (checksum_chars) {
+            LOG_STRING("CHECKSUM transmitted\n");
+            if (transum == calcsum) {
+                LOG_STRING("CHECKSUM OK\n");
+            } else {
+                LOG_STRING("CHECKSUM failed, expected/got");LOG_U8(calcsum);LOG_U8(transum);LOG_NEWLINE;
+                state = ERROR_CHECKSUM;
+            }
+        } else { // no chksum transmitted
+            if (base64_len)
+                // enforce transmitted checksum if base64data was transmitted
+                LOG_STRING("CHKSUM REQUIRED for RasterData\n");
+                state = ERROR_CHECKSUM;
+        }
+
 #ifdef DEBUG
         uint8_t i;
         for(i=0;i<31;i++) {
@@ -186,60 +224,36 @@ parser_result_t process_char(char c) {
             }
         }
 #endif
-        if (base64_len) {
-            LOG_STRING("P: TOKEN $ (");LOG_U8(base64_len);LOG_STRING("Bytes)\n");
-            // if Stepper queue is empty, transfer modulation data now, else later
-            // XXX: move on-the-fly-while-decoding to queue to save this extra buffer
-            if (STEPPER_QUEUE_is_empty()) {
-                LOG_STRING("Transferring base64 bytes");LOG_U8(base64_len);LOG_NEWLINE;
-                for(b=0;b<base64_len;b++) {
-                    LOG_X8(base64_bytes[b]);
-                    LASER_RASTERDATA_put(base64_bytes[b]);
-                }
-                base64_len=0;
-                LOG_NEWLINE;
-            }
-        }
-        // check calcsum == transum
-#ifdef DEBUG
-        if (transum) {
-            LOG_STRING("CHECKSUM transmitted\n");
-            if (transum == calcsum) {
-                LOG_STRING("CHECKSUM OK\n");
-            } else {
-                LOG_STRING("CHECKSUM failed, expected/got");LOG_U8(calcsum);LOG_U8(transum);LOG_NEWLINE;
-                state = ERROR_CHECKSUM;
-            }
-        }
-#endif
-        if ((state != ERROR_STATE) && (state != ERROR_CHECKSUM)) {
-            LOG_STRING("P: PROCESS COMMAND\n");
-            process_command();
-            // if stepper queue was not empty before, transfer modulation now
-            if (base64_len) {
-                LOG_STRING("Transferring base64 bytes");LOG_U8(base64_len);LOG_NEWLINE;
-                for(b=0;b<base64_len;b++) {
-                    LOG_X8(base64_bytes[b]);
-                    LASER_RASTERDATA_put(base64_bytes[b]);
-                }
-                LOG_NEWLINE;
-            }
-        }
-        // re-init parser
-        base64_len=0;
-        codes_seen = 0;
-        numbers_got = 0;
-        calcsum = 0;
-        transum = 0;
-        checksum_chars = 0;
-        state = EXPECT_FIRST_LETTER;
+
         switch (state) {
-            case ERROR_STATE: return PARSER_FORMAT_ERROR;
-            case ERROR_CHECKSUM: return PARSER_CHECKSUM_ERROR;
+            case ERROR_STATE:
+                state = INIT_PARSER;
+                return PARSER_FORMAT_ERROR;
+
+            case ERROR_CHECKSUM:
+                state = INIT_PARSER;
+                return PARSER_CHECKSUM_ERROR;
+
             default:
-                return PARSER_OK;
+                LOG_STRING("P: PROCESS COMMAND\n");
+                // transfer rasterdata
+                if (base64_len) {
+                    LOG_STRING("Transferring base64 bytes");LOG_U8(base64_len);LOG_NEWLINE;
+                    for(b=0;b<base64_len;b++) {
+                        LOG_X8(base64_bytes[b]);
+                        LASER_RASTERDATA_put(base64_bytes[b]);
+                    }
+                    LOG_NEWLINE;
+                }
+                // evaluate transmitted tokens
+                process_command();
+                state = INIT_PARSER;
+                return PARSER_OK; // XXX: evaluate return code of process_command() ???
         }
+
     }
+    // following code evaluate every char except \r\n
+
     // update checksum
     if (('*' == c) && (state != ERROR_STATE)) {
         state = PARSE_CHECKSUM;
@@ -256,18 +270,6 @@ parser_result_t process_char(char c) {
 
     // state dependent interpretation of characters
     switch(state) {
-        case EXPECT_FIRST_LETTER:
-            codes_seen = 0;
-            numbers_got = 0;
-            memset(numbers, 0, sizeof(numbers));
-            memset(integers, 0, sizeof(integers));
-            memset(base64_bytes, 0, sizeof(base64_bytes));
-            memset(filename, 0, sizeof(filename));
-            filename_len = 0;
-            base64_len = 0;
-            state = EXPECT_LETTER;
-            // intentionally no break !
-
         case EXPECT_LETTER:
             if ((('A'<=c) && (c<='Z'))) {
                 last_letter = c-'A';
@@ -566,7 +568,7 @@ parser_result_t process_char(char c) {
 // set up initial conditions with a G28 command (homing)
 void parser_init(void) {
     char c, *p = PSTR("F300\nG28\n");
-    state = EXPECT_FIRST_LETTER;
+    state = INIT_PARSER;
     while ((c=pgm_read_byte(p++)))
         process_char(c);
     LOG_STRING("P: init done\n");
