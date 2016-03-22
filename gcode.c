@@ -40,22 +40,24 @@
 // G2  - CW ARC
 // G3  - CCW ARC
 // G4  - Dwell S<seconds> or P<milliseconds>
-// G5  - (optional) Beziercurve
-// G7  - Laser RasterData
+// G20 - Units in inch
+// G21 - Units in mm
 // G28 - Home all Axis
 // G90 - Use Absolute Coordinates
 // G91 - Use Relative Coordinates
 // G92 - Set current position to cordinates given
-
+//
 // M Codes
 // M0   - (exit SIM mode with error)
 // M2   - (exit sim mode normally) END_OF_PROGRAM
-// M3    - enable Tool (Laser)
+// M3   - enable Tool (Laser)
 // M5   - disable Tool (Laser)
 // M400 - Finish all moves
-// M649 - Setup properties for Laser Rastering
+// M649 - Setup properties for Laser + Rastering
 //
 // planned to implement:
+// G5  - (optional) Beziercurve
+// G7  - Laser RasterData
 // M20  - List SD card
 // M21  - Init SD card
 // M22  - Release SD card
@@ -100,30 +102,45 @@ gcode_t G;
  * write to relevant data structures in the right units
  *******************************************************/
 
+number get_coord(uint8_t token) {
+    number tmp = numbers[token];
+    if (G.coords_in_inch) {
+        tmp = (127 * (int64_t) tmp) / 5;
+    }
+    return tmp;
+}
+
 // evaluate coordinates (XYZ)
 void get_coordinates(void) {
+    number tmp;
     if (numbers_got & LETTER_X_MASK) {
         LOG_STRING("G: using specified X coordinate\n");
-        if (G.axis_relative_mode[X_AXIS] || G.relative_mode)
-            G.destination[X_AXIS] += numbers[LETTER_X];
-        else
-            G.destination[X_AXIS] = numbers[LETTER_X];
+        tmp = get_coord(LETTER_X);
+        if (G.axis_relative_mode[X_AXIS] || G.relative_mode) {
+            G.destination[X_AXIS] += tmp;
+        } else {
+            G.destination[X_AXIS] = tmp;
+        }
     }
 
     if (numbers_got & LETTER_Y_MASK) {
         LOG_STRING("G: using specified Y coordinate\n");
-        if (G.axis_relative_mode[Y_AXIS] || G.relative_mode)
-            G.destination[Y_AXIS] += numbers[LETTER_Y];
-        else
-            G.destination[Y_AXIS] = numbers[LETTER_Y];
+        tmp = get_coord(LETTER_Y);
+        if (G.axis_relative_mode[Y_AXIS] || G.relative_mode) {
+            G.destination[Y_AXIS] += tmp;
+        } else {
+            G.destination[Y_AXIS] = tmp;
+        }
     }
 
     if (numbers_got & LETTER_Z_MASK) {
         LOG_STRING("G: using specified Z coordinate\n");
-        if (G.axis_relative_mode[Z_AXIS] || G.relative_mode)
-            G.destination[Z_AXIS] += numbers[LETTER_Z];
-        else
-            G.destination[Z_AXIS] = numbers[LETTER_Z];
+        tmp = get_coord(LETTER_X);
+        if (G.axis_relative_mode[Z_AXIS] || G.relative_mode) {
+            G.destination[Z_AXIS] += tmp;
+        } else {
+            G.destination[Z_AXIS] = tmp;
+        }
     }
     // transfer coordinates to planner
     PL.target[X_AXIS] = X_position2steps(G.destination[X_AXIS]);
@@ -147,17 +164,17 @@ bool get_arc_coordinates(bool ccw) {
 
     // Arc center is always relative to current position
     if (numbers_got & LETTER_I_MASK) { // center of arc in X
-        G.arc_center_x += numbers[LETTER_I];
+        G.arc_center_x += get_coord(LETTER_I);
     }
     if (numbers_got & LETTER_J_MASK) { // center of arc in Y
-        G.arc_center_y += numbers[LETTER_J];
+        G.arc_center_y += get_coord(LETTER_J);
     }
     LOG_STRING("G: ARC_center X:");LOG_S32(G.arc_center_x);LOG_NEWLINE;
     LOG_STRING("G: ARC_center Y:");LOG_S32(G.arc_center_y);LOG_NEWLINE;
 
     // calculate arc_center if not specified. uses the smaller arc if R>0, else the bigger one
     if (LETTER_R_MASK == (numbers_got & (LETTER_I_MASK|LETTER_J_MASK|LETTER_R_MASK))) { // neither I nor J given, but R
-        number R = numbers[LETTER_R];
+        number R = get_coord(LETTER_R);
         // calculate arc_center!
         // G.destination holds the new target, G.arc_center_x still holds the old one (as I was not given)
         number dx = G.destination[X_AXIS] - G.arc_center_x;
@@ -397,6 +414,7 @@ void process_command() {
                 break;
             #endif // G5_BEZIER
 
+#if 0
             case 7: // G7 Execute raster line: XXX Rework this!
                 LOG_STRING("G: G7 found: curent position is ");
                 LOG_U32(PL.position[X_AXIS]);LOG_COMMA;
@@ -433,10 +451,23 @@ void process_command() {
                 laser_set_mode(LASER_RASTER_CW); //XXX: support RASTER_PULSED as well !
                 planner_line(G.speed);
                 break;
+#endif
+
+            case 20: // G20 - Units in inch
+                G.coords_in_inch = FALSE;
+                break;
+
+            case 21: // G21 - Units in mm
+                G.coords_in_inch = TRUE;
+                break;
 
             case 28: //G28 Home (all) Axis
             {
                 uint8_t axis_mask = 0;
+
+                G.coords_in_inch = FALSE;
+                G.relative_mode = FALSE;
+
                 idle('H');
                 LOG_STRING("G: HOMING\n");
 
@@ -491,7 +522,6 @@ void process_command() {
                 }
             }
                 stepper_drain_buffer();
-                G.relative_mode = FALSE;
                 break;
 
             case 90: // G90 - absolute coordinates
@@ -532,14 +562,15 @@ void process_command() {
                 // if running on real HW, continue program
                 break;
 
-            case 3:  //M3 - fire laser
+            case 3:  // M3 - fire laser (start spindle CW)
+            case 4:  // M4 - fire laser (start spindle CCW)
                 handle_laser_opts();
                 if (!laser.mode)
                     laser_set_mode(LASER_CW);
                 planner_move(G.speed);
                 break;
 
-            case 5:  //M5 stop firing laser
+            case 5:  // M5 - stop firing laser (stop spindle)
                 {   uint8_t tmp = laser.mode;
                     laser_set_mode(LASER_OFF);
                     planner_move(G.speed);
