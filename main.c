@@ -154,7 +154,7 @@ int main(void){
     // check if avrtest is running
     // XXX: use avrtest_chars_avail (SYSCALL 26), code may be smaller.
 #ifdef DEBUG
-    avrtest_print("KKK ->%x<-\n",MIN_SP);
+    avrtest_print(PSTR("KKK ->%x<-\n"),MIN_SP);
     LOG_OFF;
     asm volatile (
     "ldi   r20, 0xff  \n\t"

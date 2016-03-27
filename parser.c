@@ -206,10 +206,11 @@ parser_result_t process_char(char c) {
                 state = ERROR_CHECKSUM;
             }
         } else { // no chksum transmitted
-            if (base64_len)
+            if (base64_len) {
                 // enforce transmitted checksum if base64data was transmitted
                 LOG_STRING("CHKSUM REQUIRED for RasterData\n");
                 state = ERROR_CHECKSUM;
+            }
         }
 
 #ifdef DEBUG
@@ -227,10 +228,12 @@ parser_result_t process_char(char c) {
 
         switch (state) {
             case ERROR_STATE:
+                LOG_STRING("P: IGNORE COMMAND: ERROR_STATE\n");
                 state = INIT_PARSER;
                 return PARSER_FORMAT_ERROR;
 
             case ERROR_CHECKSUM:
+                LOG_STRING("P: IGNORE COMMAND: CHECKSUM_ERROR\n");
                 state = INIT_PARSER;
                 return PARSER_CHECKSUM_ERROR;
 
