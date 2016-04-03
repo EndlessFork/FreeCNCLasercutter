@@ -454,11 +454,11 @@ void process_command() {
 #endif
 
             case 20: // G20 - Units in inch
-                G.coords_in_inch = FALSE;
+                G.coords_in_inch = TRUE;
                 break;
 
             case 21: // G21 - Units in mm
-                G.coords_in_inch = TRUE;
+                G.coords_in_inch = FALSE;
                 break;
 
             case 28: //G28 Home (all) Axis

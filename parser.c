@@ -206,11 +206,13 @@ parser_result_t process_char(char c) {
                 state = ERROR_CHECKSUM;
             }
         } else { // no chksum transmitted
+#ifndef DEBUG
             if (base64_len) {
                 // enforce transmitted checksum if base64data was transmitted
                 LOG_STRING("CHKSUM REQUIRED for RasterData\n");
                 state = ERROR_CHECKSUM;
             }
+#endif
         }
 
 #ifdef DEBUG

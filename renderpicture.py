@@ -5,13 +5,13 @@ from PIL import Image
 import base64
 
 
-MINWHITESKIP = 16
+MINWHITESKIP = 1
 MINLEVEL = 33
 
 class Render(object):
     #defaults
     BPP = 8
-    PixelSize = 0.2
+    PixelSize = 0.1
     bidir = True
     image = None
     speed_mm_per_s = 20
@@ -28,6 +28,7 @@ class Render(object):
         _left,_top,_right,_bottom = bb
         self.height = _bottom-_top
         self.width = _right-_left
+        self.filename = filename
 
     def encodePixelData(self, pixels, reverse = False):
         """encodes the given pixels (range 0..255) into BPP bits wide bitstrings, joins them and encodes as base64
@@ -60,7 +61,9 @@ class Render(object):
             res.append(chr(n))
         bytestring = b''.join(res)
         # call base64.encodestring on byte strings of size <=48, collect in a list, return list
-        res = []
+        # first snippet will be 15 bytes
+        res = ['$%s' % base64.encodestring(bytestring[:15])[:-1]]
+        bytestring = bytestring[15:]
         while len(bytestring) > 0:
             res.append("$%s" % base64.encodestring(bytestring[:48])[:-1]) # remove trailing \n as well
             bytestring = bytestring[48:]
@@ -127,7 +130,8 @@ class Render(object):
     def render(self):
         """renders a previously loaded image and returns the string which should be send to the cutter"""
         # header
-        res = [ ";rendered with Renderpicture.py by EndlessFork",
+        res = [ "; %r" % self.filename,
+                "; rendered with Renderpicture.py by EndlessFork",
                 "; picture is %dx%d pixels" % (self.width, self.height),
                 "; rastersize is %f x %f mm" % (self.width*self.PixelSize, self.height*self.PixelSize),
                 "; resolution is %f mm" % self.PixelSize,
@@ -159,10 +163,11 @@ class Render(object):
                         length = len(pixels)
                         # generate G0-moveToStart
                         res.append("G0 X%.3f Y%.3f" % ((startx-lastx)*self.PixelSize, (y-lasty)*self.PixelSize))
+                        # encode Pixeldata
+                        pixels = self.encodePixelData(pixels)
                         # generate G1-rasterToEndOfPiece
-                        res.append("G1 X%.3f Q%d" % (length*self.PixelSize, length))
-                        # encode Pixeldata and append
-                        res.extend(self.encodePixelData(pixels))
+                        res.append("G1 X%.3f Q%d %s" % (length*self.PixelSize, length, pixels[0]))
+                        res.extend(pixels[1:])
                         res.append("G4")
                         # bookkeeping
                         lastx = startx+length
@@ -175,10 +180,11 @@ class Render(object):
                         startx += length
                         # generate G0-moveToStart
                         res.append("G0 X%.3f Y%.3f" % ((startx-lastx)*self.PixelSize, (y-lasty)*self.PixelSize))
+                        # encode Pixeldata
+                        pixels = self.encodePixelData(pixels, True)
                         # generate G1-rasterToEndOfPiece
-                        res.append("G1 X%.3f Q%d" % (-length*self.PixelSize, length))
-                        # encode Pixeldata and append
-                        res.extend(self.encodePixelData(pixels, True))
+                        res.append("G1 X%.3f Q%d %s" % (-length*self.PixelSize, length, pixels[0]))
+                        res.extend(pixels[1:])
                         res.append("G4")
                         # bookkeeping
                         lastx = startx-length
