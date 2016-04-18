@@ -18,6 +18,22 @@
 #include <avr/pgmspace.h>
 #include <util/delay.h>
 
+/*******************
+ * Debug IRQ hangs *
+ *******************/
+// use PD7,PB3,PB2 and PB1 as diagnostic output: does not work with SDCARD!
+#define ACTIVE_IRQ_NONE {PORTB&=0xf1;PORTD&=0x7f;}
+#define ACTIVE_IRQ_1 {PORTD|=0x80;PORTB&=0xf1;PORTB|=2;} // TIMER0 - time.c
+#define ACTIVE_IRQ_2 {PORTD|=0x80;PORTB&=0xf1;PORTB|=4;} // TIMER1 - stepper.c
+#define ACTIVE_IRQ_3 {PORTD|=0x80;PORTB&=0xf1;PORTB|=6;} // UART_RX - uart.c
+#define ACTIVE_IRQ_4 {PORTD|=0x80;PORTB&=0xf1;PORTB|=8;} // TIMER3 - laser.c
+#define ACTIVE_IRQ_5 {PORTD|=0x80;PORTB&=0xf1;PORTB|=10;} // USB_GEN - usb_serial
+#define ACTIVE_IRQ_6 {PORTD|=0x80;PORTB&=0xf1;PORTB|=12;} // USB_COM - usb_serial
+#define ACTIVE_IRQ_7 {PORTD|=0x80;PORTB&=0xf1;PORTB|=14;} // UART_TX - uart.c
+
+/*********************
+ * Check stack usage *
+ *********************/
 extern uint16_t MIN_SP;
 #define CHECK_STACK {if (SP < MIN_SP) MIN_SP=SP;}
 

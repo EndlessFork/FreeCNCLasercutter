@@ -60,6 +60,7 @@ void time_init()
 
 ISR(TIMER0_COMPA_vect)
 {
+    ACTIVE_IRQ_1;
     CHECK_STACK;
     _micros += 125;
     if (++_micros_ctr >= 8){
@@ -95,4 +96,5 @@ ISR(TIMER0_COMPA_vect)
             }
         }
     }
+    ACTIVE_IRQ_NONE;
 }

@@ -96,48 +96,52 @@ void timer3_init(void) {
     TIMSK3 |= (1<<OCIE3A);
 }
 
-static uint32_t remaining_pulse;
-
 // set a timeout-timer to extinguish the laser after some us
-void laser_start_pulse_timer(uint32_t pulse_duration_us) {
+// uint24_t goes up to 16.8 million us = 16.8s.
+// we only support up to 4.1s, so uint24_t is big enough
+void laser_start_pulse_timer(uint24_t pulse_duration_us) {
     LOG_STRING("L: PULSing for");LOG_U32(pulse_duration_us);LOG_STRING("us\n");
+    CRITICAL_SECTION_START;
+    TCCR3B = 0b00001000; // stop timer3
+    TCNT3 = 0;  // next pulse start at 0 ticks...
     if (!pulse_duration_us) {
         // switch off
         TCCR3B = 0b00001000;
     } else if (pulse_duration_us < 4096) {
+        // 0..4ms
         OCR3A = 16 * pulse_duration_us;
         TCCR3B = 0b00001001; // CS=001 : div-by-1: 16 ticks per us
     } else if (pulse_duration_us < 8L * 4096) {
+        // 4..32ms
         OCR3A = 2 * pulse_duration_us;
         TCCR3B = 0b00001010; // CS=010 : div-by-8: 2 ticks per us
     } else if (pulse_duration_us < 64L * 4096) {
+        // 32..262ms
         OCR3A = pulse_duration_us / 4;
         TCCR3B = 0b00001011; // CS=011 : div-by-64: 4 us per tick
     } else if (pulse_duration_us < 256L * 4096) {
+        // 262..1048ms
         OCR3A = pulse_duration_us / 16;
         TCCR3B = 0b00001100; // CS=100 : div-by-256: 16 us per tick
     } else if (pulse_duration_us < 1024L * 4096) {
+        // 1.048..4.194s
         OCR3A = pulse_duration_us / 64;
         TCCR3B = 0b00001101; // CS=101 : div-by-1024: 64 us per tick
     } else {
-        remaining_pulse = pulse_duration_us - 512*2000L;
-        laser_start_pulse_timer(512*2000L);
-        return;
+        // Pulses longer than 4.194304s are not supported
+        // -> switch off laser
+        laser_fire(0);
     }
-    remaining_pulse = 0;
+    CRITICAL_SECTION_END;
 }
 
 ISR(TIMER3_COMPA_vect) {
+    ACTIVE_IRQ_4;
     CHECK_STACK;
-    if (laser.laser_is_on) {
-        if (remaining_pulse) {
-            laser_start_pulse_timer(remaining_pulse);
-            return;
-        }
-    }
-    TCCR3B &=~ 7; // stop timer 3 (set CS=000)
-    //~ TCNT3 = 0;  // next pulse start at 0 ticks...
+
+    TCCR3B = 0b00001000; // stop timer3
     laser_fire(0); // switch off laser (also disables timer3)
+    ACTIVE_IRQ_NONE;
 }
 
 void laser_init()
@@ -208,7 +212,6 @@ void laser_fire(uint8_t intensity){ // intensity from 0..255
 
             laser_add_time(micros() - laser.last_firing);
             TCCR3B &=~ 7; // stop pulse timer
-            TCNT3 = 0;
          }
     }
 }

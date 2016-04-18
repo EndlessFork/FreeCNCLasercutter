@@ -700,7 +700,8 @@ static uint16_t bytes_fetched;
 #endif
 
 //~ static dbgctr=0;
-ISR(TIMER1_COMPA_vect) {
+inline void _stepper_irq(void) {
+//ISR(TIMER1_COMPA_vect) {
     register state_t *s asm("r28") = state_ptr;
     block_t *b = &STEPPER_QUEUE_data[STEPPER_QUEUE_tail];
 
@@ -897,12 +898,19 @@ ISR(TIMER1_COMPA_vect) {
         // try to fetch next job
         b = &STEPPER_QUEUE_data[STEPPER_QUEUE_tail]; // update our job-pointer
 
-        // clean restbits if type of job changes
-        if (s->job != b->job)
-            s->laser.valid_bits = 0;
+        // clean restbits
+        s->laser.valid_bits = 0;
 
         // store copy of current mode for detection at first irq of next job
-        s->laser.last_mode = s->laser.mode;
+        s->laser.last_mode = LASER_OFF;
+
+        // update our Laser options (hard disable laser as default)
+        s->laser.ctr = 0;
+        s->laser.steps = 0;
+        s->laser.pulse_duration_us = 0;
+        s->laser.power = 0;
+        s->laser.mode = 0;
+        s->laser.modulation = 0;
 
         // copy job data to state
         s->job = b->job;
@@ -921,14 +929,9 @@ ISR(TIMER1_COMPA_vect) {
                 s->arc_err = b->arc.err;
                 s->arc_radius = b->arc.r;
                 s->base_ticks = b->base_ticks;
+                s->axis_mask = X_AXIS_MASK | Y_AXIS_MASK; // no Z atm. !!!
                 // update our Laser options
-                if (b->laser.mode == LASER_OFF) {
-                    s->laser.ctr = 0;
-                    s->laser.steps = 0;
-                    s->laser.pulse_duration_us = 0;
-                    s->laser.power = 0;
-                    s->laser.mode = 0;
-                } else {
+                if (b->laser.mode != LASER_OFF) {
                     s->axis_mask |= LASER_MASK;
                     s->laser.ctr = ((s->laser.mode & LASER_RASTER_CW) != 0) ? (-1) : (-((int24_t)(s->steps_total/2)));
                     s->laser.steps = b->laser.steps;
@@ -937,7 +940,6 @@ ISR(TIMER1_COMPA_vect) {
                     s->laser.mode = b->laser.mode;
                     s->laser.modulation = b->laser.modulation;
                 }
-                // XXX: b->arc.one_over_R; // 2**32 / R to be multiplied with X for speed calculation
                 break;
 
             case STEPPER_MOVE_TO:
@@ -969,14 +971,6 @@ ISR(TIMER1_COMPA_vect) {
                 s->count_direction[1] = (b->move.direction_bits & Y_AXIS_MASK) ? -1 : +1;
                 s->count_direction[2] = (b->move.direction_bits & Z_AXIS_MASK) ? -1 : +1;
                 s->base_ticks = b->base_ticks;
-
-                // update our Laser options (hard disable laser for MOVE)
-                s->laser.ctr = 0;
-                s->laser.steps = 0;
-                s->laser.pulse_duration_us = 0;
-                s->laser.power = 0;
-                s->laser.mode = 0;
-
                 break;
 
             case STEPPER_LINE:
@@ -1008,13 +1002,7 @@ ISR(TIMER1_COMPA_vect) {
                 s->base_ticks = b->base_ticks;
 
                 // update our Laser options
-                if (b->laser.mode == LASER_OFF) {
-                    s->laser.ctr = 0;
-                    s->laser.steps = 0;
-                    s->laser.pulse_duration_us = 0;
-                    s->laser.power = 0;
-                    s->laser.mode = 0;
-                } else {
+                if (b->laser.mode != LASER_OFF) {
                     s->axis_mask |= LASER_MASK;
                     s->laser.ctr = ((s->laser.mode & LASER_RASTER_CW) != 0) ? (-1) : (-((int24_t)(s->steps_total/2)));
                     s->laser.steps = b->laser.steps;
@@ -1036,13 +1024,6 @@ ISR(TIMER1_COMPA_vect) {
                 s->refpos[Z_AXIS] = b->ref.pos[Z_AXIS];
                 s->base_ticks = b->base_ticks;
 
-                // update our Laser options (hard disable laser for MOVE)
-                s->laser.ctr = 0;
-                s->laser.steps = 0;
-                s->laser.pulse_duration_us = 0;
-                s->laser.power = 0;
-                s->laser.mode = 0;
-
                 LOG_STRING("ST: HOME: REFPOS IS:");LOG_S24(s->refpos[X_AXIS]);LOG_S24(s->refpos[Y_AXIS]);LOG_S24(s->refpos[Z_AXIS]);LOG_NEWLINE;
                 break;
 
@@ -1054,28 +1035,14 @@ ISR(TIMER1_COMPA_vect) {
                 s->refpos[Z_AXIS] = b->ref.pos[Z_AXIS];
                 s->base_ticks = b->base_ticks;
 
-                // update our Laser options (hard disable laser for MOVE)
-                s->laser.ctr = 0;
-                s->laser.steps = 0;
-                s->laser.pulse_duration_us = 0;
-                s->laser.power = 0;
-                s->laser.mode = 0;
-
                 LOG_STRING("ST: HOME_REF: REFPOS IS:");LOG_S24(s->refpos[X_AXIS]);LOG_S24(s->refpos[Y_AXIS]);LOG_S24(s->refpos[Z_AXIS]);LOG_NEWLINE;
                 break;
 
             case STEPPER_IDLE:
                 LOG_STRING("IDLE\n");
-
-                // update our Laser options (hard disable laser for MOVE)
-                s->laser.ctr = 0;
-                s->laser.steps = 0;
-                s->laser.pulse_duration_us = 0;
-                s->laser.power = 0;
-                s->laser.mode = 0;
-
                 s->base_ticks = 65535;  // 3ms idle ticking
                 break;
+
             default:
                 LOG_STRING("UNHANDLED !!!\n");
         }
@@ -1103,6 +1070,11 @@ ISR(TIMER1_COMPA_vect) {
         OCR1A = s->base_ticks;
     }
     LOG_STRING("OCR1A is:");LOG_X16(OCR1A);LOG_NEWLINE;
+}
+ISR(TIMER1_COMPA_vect) {
+    ACTIVE_IRQ_2;
+    _stepper_irq();
+    ACTIVE_IRQ_NONE;
 }
 
 
@@ -1135,6 +1107,7 @@ void stepper_init(void) {
     ENABLE_X;
     ENABLE_Y;
     ENABLE_Z;
+    LASER_RASTERDATA_init();
 
     state_ptr = &STATE;
     // waveform generation = 0100 = CTC, output mode = 00 (disconnected), CS=010 (div by 8)

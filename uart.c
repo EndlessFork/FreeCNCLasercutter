@@ -70,6 +70,8 @@ uint8_t uart_available(void) {
 // Transmit Interrupt
 ISR(USART1_UDRE_vect)
 {
+    ACTIVE_IRQ_7;
+    CHECK_STACK;
     // XON/XOFF handling (hold TX buffer)
     if (XOFF_STATE & REQUEST_SENDING_XOFF) {
         UDR1 = XOFF;
@@ -84,6 +86,7 @@ ISR(USART1_UDRE_vect)
         UDR1 = UART_TX_BUFFER_data[UART_TX_BUFFER_tail];
         UART_TX_BUFFER_pop();
     }
+    ACTIVE_IRQ_NONE;
 }
 
 extern void kill(void);
@@ -94,6 +97,8 @@ ISR(USART1_RX_vect)
 //~
     //~ c = UDR1;
     // quite full -> send XOFF
+    ACTIVE_IRQ_3;
+    CHECK_STACK;
     if (UART_RX_BUFFER_used() > UART_RX_BUFFER_SIZE/4) {
         // if no XOFF send already, initiate sending XOFF
         if (~XOFF_STATE & XOFF_SEND) {
@@ -110,4 +115,5 @@ ISR(USART1_RX_vect)
         //~ UART_RX_BUFFER_pop(); //  remove oldest char
     }
     UART_RX_BUFFER_put(UDR1);
+    ACTIVE_IRQ_NONE;
 }
