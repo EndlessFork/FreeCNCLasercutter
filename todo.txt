@@ -1,5 +1,4 @@
 === HW ===
-  * laser alignment, cleaning of lens and mirrors
   * pause/unpause key
   * move z-dir/step to PORTF, use now free OCR3A for laser pulses
   * howto 'scan' the workpiece / display this as background in inkscape?
@@ -7,7 +6,6 @@
 === Firmware ===
   * choose G/M-code for pause/unpause
   * display remaining dwell time for G4
-  * rework replys (Err/resend/OK) + update pysend.py
   * correct laser pulse timing for arcs
   * testsuite! (intermediate step: gen_tests.py)
   * rewrite kernels to compute only (saves arc-duplication)
@@ -29,5 +27,8 @@
   * inkscape plugin: new or rework one?
   * eagle-layouts: plugin? user-script?
   * GUI for arranging of gcode snippets? + sending gcode? + ETA-display
+
+=== structure ===
+  * rework structure of repo
   
  
