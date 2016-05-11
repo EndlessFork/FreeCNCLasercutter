@@ -39,6 +39,12 @@ class Sender(object):
             time.sleep(1)
             self.checkqueue()
         self.port.write(line.strip())
+        # calculate checksum
+        chk=0
+        for c in line.strip():
+            chk = chk ^ ord(c)
+        # send checksum
+        self.port.write('*%d' % chk)
         self.port.write('\n')
         self.port.flush()
         self.checkreply(line.strip())
