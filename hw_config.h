@@ -29,6 +29,8 @@
 
 #include "hw_layout.h"
 
+// Experimental!
+#define USE_MCP4922
 
 /***********************
  * Mechanical Settings *

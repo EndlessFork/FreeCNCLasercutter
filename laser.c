@@ -23,6 +23,10 @@
 #include "pins.h"
 #include "asm.h"
 
+#ifdef USE_MCP4922
+#include "mcp4922.h"
+#endif
+
 #include "time.h"
 #include "hw_layout.h"
 #include "hw_config.h"
@@ -153,6 +157,11 @@ void laser_init()
     timer4_init();
     timer3_init();
 
+#ifdef USE_MCP4922
+    mcp4922_init();
+    TCCR4E &=~ (1<<OC4OE4);    // DISABLE PWM for #OC4D
+#endif
+
     // initialize state to some sane defaults
     laser.power = 100; // 10%
     laser.ppm = 1.0;
@@ -172,6 +181,21 @@ void laser_init()
 void laser_fire(uint8_t intensity){ // intensity from 0..255
     uint16_t tmp;
 
+#ifdef USE_MCP4922
+    mcp4922_set_modulation(intensity);
+    if (intensity) {
+        SET_PIN(LASER_FIRING_PIN);
+        LOG_STRING("L: ON\n");
+    } else {
+        CLR_PIN(LASER_FIRING_PIN);
+        if (laser.laser_is_on) {
+            laser_set_firing(0);
+            LOG_STRING("L: OFF\n");
+
+            laser_add_time(micros() - laser.last_firing);
+         }
+    }
+#else
     if (intensity) {
 
         if (!laser.laser_is_on)
@@ -214,6 +238,7 @@ void laser_fire(uint8_t intensity){ // intensity from 0..255
             TCCR3B &=~ 7; // stop pulse timer
          }
     }
+#endif
 }
 
 void laser_add_time(uint32_t us) {
