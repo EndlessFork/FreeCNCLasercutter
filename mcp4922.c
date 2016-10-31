@@ -3,11 +3,11 @@
 void mcp4922_send_word(uint16_t data){
     uint8_t i;
     WRITE(PIN_MCP4922_NCS, LOW);
-    for(i=0;i<16;i++) {
+    for(i=0; i<16; i++) {
         WRITE(PIN_MCP4922_CLK, LOW);
-        WRITE(PIN_MCP4922_DAT, data & 1);
+        WRITE(PIN_MCP4922_DAT, (data & 0x8000) ? HIGH : LOW);
         WRITE(PIN_MCP4922_CLK, HIGH);
-        data = data >> 1;
+        data = data << 1;
     }
     WRITE(PIN_MCP4922_NCS, HIGH);
     WRITE(PIN_MCP4922_CLK, LOW);

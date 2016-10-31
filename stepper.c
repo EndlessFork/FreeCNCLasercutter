@@ -1072,7 +1072,7 @@ inline void _stepper_irq(void) {
         LOG_STRING("Stepper:ticks:");LOG_X16(s->base_ticks);LOG_NEWLINE;
 
 #ifdef USE_MCP4922
-        mcp4922_set_master(s->laser.power);
+        mcp4922_set_master(s->laser.power<<2); // !!! 0..1000 -> 0..4095 ???
 #else
         if (s->laser.mode == LASER_OFF)
             laser_fire(0);
