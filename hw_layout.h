@@ -32,9 +32,9 @@
     Serial via USB (dedicated pins)
 TIMERs PIN    Function
        PF7    TOUCH7     (Touchscreen?, not yet used)
-       PF6    TOUCH6     (Touchscreen?, not yet used)
-       PF5    TOUCH5     (Touchscreen?, not yet used)
-       PF4    TOUCH4     (Touchscreen?, not yet used)
+       PF6    TOUCH6     (Touchscreen?, not yet used) Experimental: MCP4922_nCS
+       PF5    TOUCH5     (Touchscreen?, not yet used) Experimental: MCP4922_DAT
+       PF4    TOUCH4     (Touchscreen?, not yet used) Experimental: MCP4922_CLK
        PF1    Y_HOME     (-> limit sw for Y)
        PF0    X_HOME     (-> limit sw for X)
        PE6    Z_HOME     (not yet connected)

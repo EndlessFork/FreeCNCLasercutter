@@ -5,6 +5,10 @@
 #include "stepper.h"
 #include "asm.h"
 
+#ifdef USE_MCP4922
+#include "mcp4922.h"
+#endif
+
 #define LOG_POS {if (laser.laser_is_on) {LOG_STRING("Stepper is at");LOG_S24(s->position[0]);LOG_COMMA;LOG_S24(s->position[1]);LOG_COMMA;LOG_S24(s->position[2]);LOG_NEWLINE;};}
 #define LOG_STEP(dirstr) {LOG_STRING("Stepping " dirstr "\n");}
 
@@ -815,13 +819,14 @@ inline void _stepper_irq(void) {
                 if (s->laser.mode & LASER_PULSE) {
                     // modulate pulse
                     LOG_STRING("ST: LASER_PULSE");LOG_U32(s->laser.pulse_duration_us);LOG_STRING("us\n");
-                    laser_fire(s->laser.power >> 2); // HACK!
+                    laser_fire(255); // !!!
                     laser_start_pulse_timer(s->laser.pulse_duration_us);
                 }
                 if (s->laser.mode & LASER_CW) {
                     // switch laser on
                     LOG_STRING("ST: LASER_CW");LOG_U8(modulate_value);LOG_NEWLINE;
-                    laser_fire(s->laser.power >> 2); // HACK!
+                    laser_fire(255); // !!!
+                    laser_start_pulse_timer(4000000); // 4s max
                 }
                 if (s->laser.mode == LASER_OFF) {
                     laser_fire(0);
@@ -1061,12 +1066,17 @@ inline void _stepper_irq(void) {
         LOG_STRING("New Job: properties:\n");
         LOG_STRING("Laser:  steps:");LOG_U24(s->laser.steps);LOG_NEWLINE;
         LOG_STRING("Laser:    ctr:");LOG_S24(s->laser.ctr);LOG_NEWLINE;
+        LOG_STRING("Laser:  power:");LOG_U8(s->laser.power);LOG_NEWLINE;
         LOG_STRING("Laser:   mode:");LOG_U8(s->laser.mode);LOG_NEWLINE;
         LOG_STRING("Laser:   bits:");LOG_U8(s->laser.modulation+1);LOG_NEWLINE;
         LOG_STRING("Stepper:ticks:");LOG_X16(s->base_ticks);LOG_NEWLINE;
 
+#ifdef USE_MCP4922
+        mcp4922_set_master(s->laser.power);
+#else
         if (s->laser.mode == LASER_OFF)
             laser_fire(0);
+#endif
         OCR1A = s->base_ticks;
     }
     LOG_STRING("OCR1A is:");LOG_X16(OCR1A);LOG_NEWLINE;
