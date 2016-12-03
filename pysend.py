@@ -56,6 +56,7 @@ class Sender(object):
             print "\rline %d of %d" %(idx, len(lines)),
             sys.stdout.flush()
             self.sendline(l)
+        print "100% done"
 
     def sendnamedfile(self, filename):
         with open(filename, 'r') as f:

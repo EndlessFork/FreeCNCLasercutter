@@ -5,8 +5,8 @@ from PIL import Image
 import base64
 
 
-MINWHITESKIP = 1
-MINLEVEL = 33
+MINWHITESKIP = 16
+MINLEVEL = 3
 
 class Render(object):
     #defaults
