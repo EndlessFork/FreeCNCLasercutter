@@ -195,8 +195,8 @@ bool get_arc_coordinates(bool ccw) {
         LOG_STRING("G: get_arc_center: dist:");LOG_S32(dist);LOG_NEWLINE;
         LOG_STRING("G: get_arc_center: h:");LOG_S32(h);LOG_NEWLINE;
         // calculate 1st part of final arc_center
-        G.arc_center_x = dy * h / dist;
-        G.arc_center_y = -dx * h / dist;
+        G.arc_center_x = ((int64_t)dy) * ((int64_t)h) / dist;
+        G.arc_center_y = -((int64_t)dx) * ((int64_t)h) / dist;
         LOG_STRING("G: get_arc_center: relative X:");LOG_S32(G.arc_center_x);LOG_NEWLINE;
         LOG_STRING("G: get_arc_center: relative Y:");LOG_S32(G.arc_center_y);LOG_NEWLINE;
 

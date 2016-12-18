@@ -6,7 +6,7 @@
 // include git version as VERSION define
 #include "Version"
 
-#include <inttypes.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 
