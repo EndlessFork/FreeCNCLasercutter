@@ -70,7 +70,7 @@ void laser_update_lifetime(void);
 
 void laser_fire(uint8_t intensity);
 
-void laser_start_pulse_timer(uint32_t pulse_us);
+void laser_start_pulse_timer(uint24_t pulse_us);
 void laser_add_time(uint32_t us);
 void laser_set_mode(uint8_t mode);
 void laser_set_ppm(number ppm);

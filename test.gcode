@@ -1,5 +1,20 @@
 ; full line comments
 
+; test checksums
+G28*77
+G91
+G0 Y-10 F600
+G0 Y-10 F900
+G0 Y-10 F1200
+G0 Y-10 F1800
+G0 Y-10 F2400
+G0 Y-10 F3600
+G0 Y-10 F4800
+G0 Y-10 F7200
+G0 Y-10 F9600
+G0 Y-10 F14400
+G90
+
 ; rounded square
 G0 X5 Y0 Z0 ; partial comment
 M649 S13.7 L2 P5 B2 C1(short comments DO NOT NEST!)

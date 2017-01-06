@@ -64,10 +64,10 @@ extern void idle(char);
     bool NAME ## _can_read(void) {return ! NAME ## _is_empty();} \
     bool NAME ## _is_full(void) {return ((NAME ## _head +1) & (SIZE-1)) == NAME ## _tail;} \
     bool NAME ## _can_write(void) {return ! NAME ## _is_full();} \
-    void NAME ## _push(void) {while ( NAME ## _is_full()) idle('B'); NAME ## _head = ((NAME ## _head + 1) & (SIZE-1));} \
+    void NAME ## _push(void) {while ( NAME ## _is_full()) {LOG_STRING("BUFFER " #NAME " Blocked\n");idle('B');}; NAME ## _head = ((NAME ## _head + 1) & (SIZE-1));} \
     void NAME ## _pop(void) {NAME ## _tail = (( NAME ## _tail +1) & (SIZE-1));} \
     uint8_t NAME ## _used(void) { return (NAME ## _head - NAME ## _tail) & (SIZE-1);} \
-    TYPE NAME ## _get(void){TYPE c; while ( NAME ## _is_empty()) idle('B');c= NAME ## _data[ NAME ## _tail]; NAME ## _pop(); return c;} \
+    TYPE NAME ## _get(void){TYPE c; while ( NAME ## _is_empty()) {LOG_STRING("BUFFER " #NAME " Blocked\n");idle('b');};c= NAME ## _data[ NAME ## _tail]; NAME ## _pop(); return c;} \
     void NAME ## _put(TYPE c){ NAME ## _data[ NAME ## _head]=c; NAME ## _push();}
 
 // anlegen eines buffers in H-files (extern Data refs. + protos)

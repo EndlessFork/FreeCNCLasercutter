@@ -10,7 +10,7 @@
 #include <string.h> // for memset
 
 
-#define LOG_PARSE_ERROR(MSG)  {LOG_STRING("P: ERROR: " MSG " in " __FILE__ ":");LOG_U16(__LINE__);LOG_NEWLINE;state = ERROR_STATE;return FALSE;}
+#define LOG_PARSE_ERROR(MSG)  {cmd_print(PSTR("ERROR: " MSG "\t")); LOG_STRING("P: ERROR: " MSG " in " __FILE__ ":");LOG_U16(__LINE__);LOG_NEWLINE;state = ERROR_STATE;return PARSER_FORMAT_ERROR;}
 
 
 
@@ -30,7 +30,7 @@
  */
 
 typedef enum {
-    EXPECT_FIRST_LETTER = 0,
+    INIT_PARSER = 0,
     EXPECT_LETTER,
     EXPECT_NUMBER_OR_SIGN,
     EXPECT_FIRST_DIGIT,    // must be a digit
@@ -41,6 +41,7 @@ typedef enum {
     EXPECT_BASE64_3,    // expect third char of a base64-string (may be '=')
     EXPECT_BASE64_4,    // expect fourth char of a base64-string (may be '=')
     ERROR_STATE,    // some error occured. ignore untile EOL and do not precess_command()
+    ERROR_CHECKSUM, // checksum mismatch
     COMMENT_MODE,    // inside comment mode ()
     IGNORE_REST,    // after a ; (comment until end of line)
     PARSE_CHECKSUM, // after a '*': parse digits of the checksum
@@ -63,7 +64,7 @@ static uint32_t current_int;
 
 
 // new style
-static parse_state state = EXPECT_FIRST_LETTER;
+static parse_state state = INIT_PARSER;
 static bool isNegative = FALSE;
 static uint8_t digits = 0; // how many digits (before any '.') are processed
 static uint8_t subdigits = 0; // how many digits (after any '.') are processed
@@ -72,7 +73,9 @@ uint8_t base64_len = 0; // amount of valid bytes pushed into LASER_RASTERDATA BU
 #define MAX_FILENAME_LEN 16
 char filename[MAX_FILENAME_LEN]; // filename for M20..M33 commands
 uint8_t filename_len = 0; // amount of valid characters in filename
-
+uint8_t calcsum; // chksum calculated so far (char by char)
+uint8_t transum; // transmitted chksum (if any)
+uint8_t checksum_chars; // chars of transmitted checksum decoded so far
 
 // Base64 decoding helper (alphabet see https://de.wikipedia.org/wiki/Base64 )
 // returns index into
@@ -145,8 +148,6 @@ uint8_t filename_len = 0; // amount of valid characters in filename
 // 111110 +-
 // 111111 /_
 
-
-
 uint8_t base64_value(char c) {
     if (('A' <= c) && (c <= 'Z')) return (uint8_t) c - 'A';
     if (('a' <= c) && (c <= 'z')) return (uint8_t) c - 'a' + 26;
@@ -158,20 +159,62 @@ uint8_t base64_value(char c) {
     return 255; // mark error
 }
 
-// parses a line and calls process_cmd if end-of-line found
-// atm no checksums are checked or properly ignored!
-// return TRUE if OK, FALSE if parse error
 
-bool process_char(char c) {
+// transport protocol parser
+// evaluates checksum (if any), end of line and stuff.
+// calls process_command at '\n' if not in ERROR_STATE
+
+parser_result_t process_char(char c) {
     bool isDigit = (('0'<=c) && (c<='9'));
     bool isWhite = ((' ' == c)||('\t'==c));
     uint8_t b = 0;
 
+    if (state == INIT_PARSER) {
+        // re-init parser
+        last_letter = 0;
+        codes_seen = 0;
+        numbers_got = 0;
+        current_int = 0;
+        isNegative = FALSE;
+        digits = 0;
+        subdigits = 0;
+        base64_len = 0;
+        filename_len = 0;
+        calcsum = 0;
+        transum = 0;
+        checksum_chars = 0;
+        memset(numbers, 0, sizeof(numbers));
+        memset(integers, 0, sizeof(integers));
+        memset(base64_bytes, 0, sizeof(base64_bytes));
+        memset(filename, 0, sizeof(filename));
+        state = EXPECT_LETTER;
+    }
+
     // ignore '\r'
-    if (('\r' == c))
-        return TRUE;
+    if ('\r' == c)
+        return PARSER_NEXTCHAR;
+
     // at end-of-line, command is complete => call process_command
     if (('\n' == c)) {
+        // check calcsum == transum
+        if (checksum_chars) {
+            LOG_STRING("CHECKSUM transmitted\n");
+            if (transum == calcsum) {
+                LOG_STRING("CHECKSUM OK\n");
+            } else {
+                LOG_STRING("CHECKSUM failed, expected/got");LOG_U8(calcsum);LOG_U8(transum);LOG_NEWLINE;
+                state = ERROR_CHECKSUM;
+            }
+        } else { // no chksum transmitted
+#ifndef DEBUG
+            if (base64_len) {
+                // enforce transmitted checksum if base64data was transmitted
+                LOG_STRING("CHKSUM REQUIRED for RasterData\n");
+                state = ERROR_CHECKSUM;
+            }
+#endif
+        }
+
 #ifdef DEBUG
         uint8_t i;
         for(i=0;i<31;i++) {
@@ -184,94 +227,100 @@ bool process_char(char c) {
             }
         }
 #endif
-        if (base64_len) {
-            LOG_STRING("P: TOKEN $ (");LOG_U8(base64_len);LOG_STRING("Bytes)\n");
-            // if Stepper queue is empty, transfer modulation data now, else later
-            if (STEPPER_QUEUE_is_empty()) {
-                for(b=0;b<base64_len;b++)
-                    LASER_RASTERDATA_put(base64_bytes[b]);
-                base64_len=b=0;
-            }
+
+        switch (state) {
+            case ERROR_STATE:
+                LOG_STRING("P: IGNORE COMMAND: ERROR_STATE\n");
+                state = INIT_PARSER;
+                return PARSER_FORMAT_ERROR;
+
+            case ERROR_CHECKSUM:
+                LOG_STRING("P: IGNORE COMMAND: CHECKSUM_ERROR\n");
+                state = INIT_PARSER;
+                return PARSER_CHECKSUM_ERROR;
+
+            default:
+                LOG_STRING("P: PROCESS COMMAND\n");
+                // transfer rasterdata
+                if (base64_len) {
+                    LOG_STRING("Transferring base64 bytes");LOG_U8(base64_len);LOG_NEWLINE;
+                    for(b=0;b<base64_len;b++) {
+                        LOG_X8(base64_bytes[b]);
+                        LASER_RASTERDATA_put(base64_bytes[b]);
+                    }
+                    LOG_NEWLINE;
+                }
+                // evaluate transmitted tokens
+                process_command();
+                state = INIT_PARSER;
+                return PARSER_OK; // XXX: evaluate return code of process_command() ???
         }
-        if (state != ERROR_STATE) {
-            LOG_STRING("P: PROCESS COMMAND\n");
-            process_command();
-            // if stepper queue was not empty before, transfer modulation now
-            if(base64_len) {
-                for(b=0;b<base64_len;b++)
-                    LASER_RASTERDATA_put(base64_bytes[b]);
-                base64_len=0;
-            }
-        } else
-            LOG_STRING("P: ERROR-STATE: IGNORE COMMAND!\n");
-        // re-init parser
-        codes_seen = 0;
-        numbers_got = 0;
-        state = EXPECT_FIRST_LETTER;
-        return state != ERROR_STATE;
+
     }
-    // XXX update checksum
+    // following code evaluate every char except \r\n
+
+    // update checksum
+    if (('*' == c) && (state != ERROR_STATE)) {
+        state = PARSE_CHECKSUM;
+        return PARSER_NEXTCHAR;
+    }
+
+    if (state != PARSE_CHECKSUM) {
+        if (!checksum_chars) {
+            LOG_STRING("update CHECKSUM from/with/to");LOG_X8(calcsum);LOG_X8(c);
+            calcsum ^= c;
+            LOG_X8(calcsum);LOG_NEWLINE;
+        }
+    }
 
     // state dependent interpretation of characters
     switch(state) {
-        case EXPECT_FIRST_LETTER:
-            codes_seen = 0;
-            numbers_got = 0;
-            memset(numbers, 0, sizeof(numbers));
-            memset(integers, 0, sizeof(integers));
-            memset(base64_bytes, 0, sizeof(base64_bytes));
-            memset(filename, 0, sizeof(filename));
-            filename_len = 0;
-            base64_len = 0;
-            state = EXPECT_LETTER;
-            // intentionally no break !
         case EXPECT_LETTER:
             if ((('A'<=c) && (c<='Z'))) {
                 last_letter = c-'A';
                 codes_seen |= ((uint32_t)1) << last_letter;
                 state = EXPECT_NUMBER_OR_SIGN;
-                return TRUE;
+                return PARSER_NEXTCHAR;
             } else if (isWhite) { // ignore whitespace
-                return TRUE;
-            } else if ('*' == c) {
-                state = PARSE_CHECKSUM;
-                return TRUE;
+                return PARSER_NEXTCHAR;
             } else if (';' == c) {
                 state = IGNORE_REST;
-                return TRUE;
+                return PARSER_NEXTCHAR;
             } else if ('(' == c) {
                 state = COMMENT_MODE;
-                return TRUE;
+                return PARSER_NEXTCHAR;
             } else if ('$' == c) {
                 state = EXPECT_BASE64_1;
-                return TRUE;
+                return PARSER_NEXTCHAR;
             } else if ('\'' == c) {
                 state = PARSE_FILENAME_TICKS;
-                return TRUE;
+                return PARSER_NEXTCHAR;
             } else if ('"' == c) {
                 state = PARSE_FILENAME_DOUBLETICKS;
-                return TRUE;
+                return PARSER_NEXTCHAR;
             } else if (!filename_len) {
                 state = PARSE_FILENAME;
                 filename[filename_len++] = c;
                 filename[filename_len] = 0;
-                return TRUE;
+                return PARSER_NEXTCHAR;
             }
-            LOG_PARSE_ERROR("unexpected character and filename already set!");
-            break;
+            LOG_PARSE_ERROR("EXPECT_LETTER: unexpected character and filename already set!");
+            //~ return PARSER_FORMAT_ERROR; // LOG_PARSE_ERROR already returns this
+            //~ break;
+
         case EXPECT_NUMBER_OR_SIGN:
             if (isWhite) {
                 state = EXPECT_LETTER;
-                return TRUE;
+                return PARSER_NEXTCHAR;
             } else if (!(isDigit || (c == '+') || (c=='-'))) {
                 if (filename_len) {
-                    LOG_PARSE_ERROR("filename already set: unexpected character found");
+                    LOG_PARSE_ERROR("EXPECT_NUMBER_OR_SIGN: filename already set: unexpected character found");
                 }
                 state = PARSE_FILENAME;
                 filename[filename_len++] = last_letter + 'A';
                 filename[filename_len++] = c;
                 filename[filename_len] = 0;
-                return TRUE;
+                return PARSER_NEXTCHAR;
             }
             state = EXPECT_FIRST_DIGIT;
             current_int = 0;
@@ -279,27 +328,29 @@ bool process_char(char c) {
             subdigits = 0;
             if (c == '-') {
                 isNegative = TRUE;
-                return TRUE;
+                return PARSER_NEXTCHAR;
             }
             isNegative = FALSE;
             if (c == '+')    // needless, but valid
-                return TRUE;
+                return PARSER_NEXTCHAR;
             // intentionally no break!
+
         case EXPECT_FIRST_DIGIT:    // first digit of a number
             if (isWhite) {
                 state = EXPECT_LETTER;
-                return TRUE;
+                return PARSER_NEXTCHAR;
             } else if (!isDigit)
-                LOG_PARSE_ERROR("Expected [0-9\\w]");
+                LOG_PARSE_ERROR("FIRST_DIGIT: Expected [0-9\\w]");
             current_int = (uint8_t) c - '0';
             digits++;
             state = EXPECT_ANOTHERDIGIT;
             // fall through to number storage
             break;
+
         case EXPECT_ANOTHERDIGIT: // digits of a number before '.' or 'eE'
             if (isDigit) {
                 if (digits>9)
-                    LOG_PARSE_ERROR("Too many leading digits!");
+                    LOG_PARSE_ERROR("EXPECT_ANOTHERDIGIT: Too many leading digits!");
                 times_ten(current_int);
                 current_int += (uint8_t) (c - '0');
                 digits++;
@@ -330,15 +381,15 @@ bool process_char(char c) {
                 state = PARSE_FILENAME_DOUBLETICKS;
                 break;
             } else
-                LOG_PARSE_ERROR("Expected [0-9.\\w]");
+                LOG_PARSE_ERROR("EXPECT_ANOTHERDIGIT: Expected [0-9.\\w]");
 
         case EXPECT_SUBDIGITS:    // digits of a number after '.'
             if (isDigit) {
                 if (subdigits >= SCALE_DIGITS) // ignore further digits
-                    return TRUE;
+                    return PARSER_NEXTCHAR;
                 if (digits+subdigits > 9) //capacity exceeded!
                     //~ LOG_PARSE_ERROR("Too many total digits!");
-                    return TRUE; // ignore further digits
+                    return PARSER_NEXTCHAR; // ignore further digits
                 times_ten(current_int);
                 current_int += (uint8_t) (c - '0');
                 subdigits++;
@@ -346,110 +397,133 @@ bool process_char(char c) {
                 break;
             } else if (isWhite) {
                 state = EXPECT_LETTER;
-                return TRUE;
+                return PARSER_NEXTCHAR;
             } else
-                LOG_PARSE_ERROR("Expected [0-9\\w]");
+                LOG_PARSE_ERROR("EXPECT_SUBDIGITS: Expected [0-9\\w]");
+
         case EXPECT_BASE64_1:    // expect first char of a base64-string
             if (isWhite) {
                 state = EXPECT_LETTER;
-                return TRUE;
+                return PARSER_NEXTCHAR;
             }
             b = base64_value(c);
             if (b > 63) {
-                state = IGNORE_REST;
-                LOG_PARSE_ERROR("Expected a BASE64 character");
+                LOG_PARSE_ERROR("EXPECT_BASE64_1: Expected a BASE64 character");
             }
             base64_bytes[base64_len] = b<<2;
             state = EXPECT_BASE64_2;
-            return TRUE;
+            return PARSER_NEXTCHAR;
+
         case EXPECT_BASE64_2:    // expect second char of a base64-string
             b = base64_value(c);
             if (b > 63) {
-                state = IGNORE_REST;
-                LOG_PARSE_ERROR("Expected a BASE64 character");
+                LOG_PARSE_ERROR("EXPECT_BASE64_2: Expected a BASE64 character");
             }
             base64_bytes[base64_len++] |= (b >> 4);
             if (base64_len >= sizeof(base64_bytes)) {
-                state = IGNORE_REST;
-                LOG_PARSE_ERROR("Too many Base64 Bytes (Buffer full)");
+                LOG_PARSE_ERROR("EXPECT_BASE64_2: Too many Base64 Bytes (Buffer full)");
             }
             base64_bytes[base64_len] = (b << 4);
             state = EXPECT_BASE64_3;
-            return TRUE;
+            return PARSER_NEXTCHAR;
+
         case EXPECT_BASE64_3:    // expect third char of a base64-string (may be '=')
             if ('=' != c) {
                 b = base64_value(c);
                 if (b > 63) {
-                    state = IGNORE_REST;
-                    LOG_PARSE_ERROR("Expected a BASE64 character");
+                    LOG_PARSE_ERROR("EXPECT_BASE64_3: Expected a BASE64 character");
                 }
                 base64_bytes[base64_len++] |= (b >> 2);
                 if (base64_len >= sizeof(base64_bytes)) {
-                    state = IGNORE_REST;
-                    LOG_PARSE_ERROR("Too many Base64 Bytes (Buffer full)");
+                    LOG_PARSE_ERROR("EXPECT_BASE64_3: Too many Base64 Bytes (Buffer full)");
                 }
                 base64_bytes[base64_len] = (b << 6);
             }
             state = EXPECT_BASE64_4;
-            return TRUE;
+            return PARSER_NEXTCHAR;
+
         case EXPECT_BASE64_4:    // expect fourth char of a base64-string (may be '=')
             if ('=' != c) {
                 b = base64_value(c);
                 if (b > 63) {
-                    state = IGNORE_REST;
-                    LOG_PARSE_ERROR("Expected a BASE64 character");
+                    LOG_PARSE_ERROR("EXPECT_BASE64_4: Expected a BASE64 character");
                 }
                 base64_bytes[base64_len++] |= b;
                 if (base64_len >= sizeof(base64_bytes)) {
-                    state = IGNORE_REST;
-                    LOG_PARSE_ERROR("Too many Base64 Bytes (Buffer full)");
+                    LOG_PARSE_ERROR("EXPECT_BASE64_4: Too many Base64 Bytes (Buffer full)");
                 }
             }
             state = EXPECT_BASE64_1;
-            return TRUE;
+            return PARSER_NEXTCHAR;
+
         case COMMENT_MODE:    // inside comment mode ()
             // just eat everything between '(' and ')'
             if (c == ')') {
                 state = EXPECT_LETTER;
             }
-            return TRUE;
+            return PARSER_NEXTCHAR;
+
         case ERROR_STATE: // after an error, ignore until end of line and do not process_command at eol!
-            return FALSE;
+            return PARSER_FORMAT_ERROR;
+
         case PARSE_CHECKSUM: // after a '*': parse digits of the checksum (untile end of line)
-            // ignored.
+            if (c == ';') {
+                state = IGNORE_REST;
+                return PARSER_NEXTCHAR;
+            } else if (c == '(') {
+                state = COMMENT_MODE;
+                return PARSER_NEXTCHAR;
+            } else if (isDigit) {
+                if (transum > 25) {
+                    state = ERROR_STATE;
+                    return PARSER_FORMAT_ERROR;
+                }
+                checksum_chars++;
+                LOG_STRING("CHECKSUM digit/now ");LOG_CHAR(c);
+                transum = transum*10 + (c - '0');
+                LOG_U8(transum);LOG_NEWLINE;
+                return PARSER_NEXTCHAR;
+            } else {
+                state = ERROR_STATE;
+                return PARSER_FORMAT_ERROR;
+            }
+
         case IGNORE_REST:    // after a ; (comment until end of line)
             // just eat everything after a ';'
-            return TRUE;
+            return PARSER_NEXTCHAR;
+
         case PARSE_FILENAME_DOUBLETICKS: // parse filename inside double ticks ""
             if ('"' == c) {
                 state = EXPECT_LETTER;
-                return TRUE;
+                return PARSER_NEXTCHAR;
             }
             b = filename_len;
             filename[b++] = c;
             filename[b] = 0;
             filename_len = b;
-            return (filename_len < sizeof(filename));
+            return (filename_len < sizeof(filename)) ? PARSER_NEXTCHAR : PARSER_FORMAT_ERROR;
+
         case PARSE_FILENAME_TICKS: // parse filename inside single ticks ''
             if ('\'' == c) {
                 state = EXPECT_LETTER;
-                return TRUE;
+                return PARSER_NEXTCHAR;
             }
             b = filename_len;
             filename[b++] = c;
             filename[b] = 0;
             filename_len = b;
-            return (filename_len < sizeof(filename));
+            return (filename_len < sizeof(filename)) ? PARSER_NEXTCHAR : PARSER_FORMAT_ERROR;
+
         case PARSE_FILENAME: // Characters which must be a filename
             if (isWhite) {
                 state = EXPECT_LETTER;
-                return TRUE;
+                return PARSER_NEXTCHAR;
             }
             b = filename_len;
             filename[b++] = c;
             filename[b] = 0;
             filename_len = b;
-            return (filename_len < sizeof(filename));
+            return (filename_len < sizeof(filename)) ? PARSER_NEXTCHAR : PARSER_FORMAT_ERROR;
 
         default:
             LOG_PARSE_ERROR("Unknown or undefined State");
@@ -492,43 +566,15 @@ bool process_char(char c) {
         //~ LOG_S32(integers[last_letter]);avrtest_putchar('\n');
 
     }
-    return TRUE;
+    return PARSER_NEXTCHAR;
 }
+
 
 // set up initial conditions with a G28 command (homing)
 void parser_init(void) {
-    state = EXPECT_FIRST_LETTER;
-    process_char('F');
-    process_char('3');
-    process_char('0');
-    process_char('0');
-    process_char('\n');
-    if (!SIM_ACTIVE) {
-        process_char('G');
-        process_char('2');
-        process_char('8');
-        process_char('\n');
-    }
+    char c, *p = PSTR("F300\nG28\n");
+    state = INIT_PARSER;
+    while ((c=pgm_read_byte(p++)))
+        process_char(c);
     LOG_STRING("P: init done\n");
 }
-
-#if 0
-void ClearToSend(void)
-{
-  previous_millis_cmd = millis();
-  #ifdef SDSUPPORT
-  if(fromsd[bufindr])
-    return;
-  #endif //SDSUPPORT
-  //~ SERIAL_PROTOCOLLNPGM(MSG_OK);
-}
-
-void FlushSerialRequestResend(void)
-{
-  //uint8_t cmdbuffer[bufindr][100]="Resend:";
-  //~ MYSERIAL.flush();
-  //~ SERIAL_PROTOCOLPGM(MSG_RESEND);
-  //~ SERIAL_PROTOCOLLN(gcode_LastN + 1);
-  ClearToSend();
-}
-#endif

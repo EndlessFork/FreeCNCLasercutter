@@ -3,9 +3,10 @@
 
 //~ #define DEBUG
 
+// include git version as VERSION define
+#include "Version"
 
-
-#include <inttypes.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -17,6 +18,22 @@
 #include <avr/pgmspace.h>
 #include <util/delay.h>
 
+/*******************
+ * Debug IRQ hangs *
+ *******************/
+// use PD7,PB3,PB2 and PB1 as diagnostic output: does not work with SDCARD!
+#define ACTIVE_IRQ_NONE {PORTB&=0xf1;PORTD&=0x7f;}
+#define ACTIVE_IRQ_1 {PORTD|=0x80;PORTB&=0xf1;PORTB|=2;} // TIMER0 - time.c
+#define ACTIVE_IRQ_2 {PORTD|=0x80;PORTB&=0xf1;PORTB|=4;} // TIMER1 - stepper.c
+#define ACTIVE_IRQ_3 {PORTD|=0x80;PORTB&=0xf1;PORTB|=6;} // UART_RX - uart.c
+#define ACTIVE_IRQ_4 {PORTD|=0x80;PORTB&=0xf1;PORTB|=8;} // TIMER3 - laser.c
+#define ACTIVE_IRQ_5 {PORTD|=0x80;PORTB&=0xf1;PORTB|=10;} // USB_GEN - usb_serial
+#define ACTIVE_IRQ_6 {PORTD|=0x80;PORTB&=0xf1;PORTB|=12;} // USB_COM - usb_serial
+#define ACTIVE_IRQ_7 {PORTD|=0x80;PORTB&=0xf1;PORTB|=14;} // UART_TX - uart.c
+
+/*********************
+ * Check stack usage *
+ *********************/
 extern uint16_t MIN_SP;
 #define CHECK_STACK {if (SP < MIN_SP) MIN_SP=SP;}
 
@@ -124,10 +141,10 @@ typedef int32_t number;
 
 typedef uint8_t mask_t;
 // en/disable parts of movement in axis_mask
-#define X_AXIS_MASK 0b0001
-#define Y_AXIS_MASK 0b0010
-#define Z_AXIS_MASK 0b0100
-#define LASER_MASK  0b1000
+#define X_AXIS_MASK ((uint8_t) 0b0001)
+#define Y_AXIS_MASK ((uint8_t) 0b0010)
+#define Z_AXIS_MASK ((uint8_t) 0b0100)
+#define LASER_MASK  ((uint8_t) 0b1000)
 
 typedef int24_t StepperPos;
 typedef uint24_t StepperCnt;

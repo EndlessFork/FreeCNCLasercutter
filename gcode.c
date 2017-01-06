@@ -40,18 +40,24 @@
 // G2  - CW ARC
 // G3  - CCW ARC
 // G4  - Dwell S<seconds> or P<milliseconds>
-// G5  - (optional) Beziercurve
-// G7  - Laser RasterData
+// G20 - Units in inch
+// G21 - Units in mm
 // G28 - Home all Axis
 // G90 - Use Absolute Coordinates
 // G91 - Use Relative Coordinates
 // G92 - Set current position to cordinates given
-
+//
 // M Codes
 // M0   - (exit SIM mode with error)
 // M2   - (exit sim mode normally) END_OF_PROGRAM
-// M3    - enable Tool (Laser)
+// M3   - enable Tool (Laser)
 // M5   - disable Tool (Laser)
+// M400 - Finish all moves
+// M649 - Setup properties for Laser + Rastering
+//
+// planned to implement:
+// G5  - (optional) Beziercurve
+// G7  - Laser RasterData
 // M20  - List SD card
 // M21  - Init SD card
 // M22  - Release SD card
@@ -76,13 +82,11 @@
 // M204 - Set default accel: S normal moves T laser moves (M204 S3000 T7000) im mm/sec^2
 // M205 - advanced settings:  minimum travel G.speed S=while printing T=travel only,  B=minimum segment time X= maximum xy jerk, Z=maximum Z jerk, E=maximum E jerk
 // M206 - set additional homeing offset
-// M400 - Finish all moves
 // M500 - stores paramters in EEPROM
 // M501 - reads parameters from EEPROM (if you need reset them after you changed them temporarily).
 // M502 - reverts to the default "factory settings".  You still need to store them in EEPROM afterwards if you want to.
 // M503 - print the current settings (from memory not from eeprom)
 // M540 - Use S[0|1] to enable or disable the stop SD card print on endstop hit (requires ABORT_ON_ENDSTOP_HIT_FEATURE_ENABLED)
-// M649 - Setup properties for Laser Rastering
 // M999 - Restart after being stopped by error
 
 
@@ -98,30 +102,45 @@ gcode_t G;
  * write to relevant data structures in the right units
  *******************************************************/
 
+number get_coord(uint8_t token) {
+    number tmp = numbers[token];
+    if (G.coords_in_inch) {
+        tmp = (127 * (int64_t) tmp) / 5;
+    }
+    return tmp;
+}
+
 // evaluate coordinates (XYZ)
 void get_coordinates(void) {
+    number tmp;
     if (numbers_got & LETTER_X_MASK) {
         LOG_STRING("G: using specified X coordinate\n");
-        if (G.axis_relative_mode[X_AXIS] || G.relative_mode)
-            G.destination[X_AXIS] += numbers[LETTER_X];
-        else
-            G.destination[X_AXIS] = numbers[LETTER_X];
+        tmp = get_coord(LETTER_X);
+        if (G.axis_relative_mode[X_AXIS] || G.relative_mode) {
+            G.destination[X_AXIS] += tmp;
+        } else {
+            G.destination[X_AXIS] = tmp;
+        }
     }
 
     if (numbers_got & LETTER_Y_MASK) {
         LOG_STRING("G: using specified Y coordinate\n");
-        if (G.axis_relative_mode[Y_AXIS] || G.relative_mode)
-            G.destination[Y_AXIS] += numbers[LETTER_Y];
-        else
-            G.destination[Y_AXIS] = numbers[LETTER_Y];
+        tmp = get_coord(LETTER_Y);
+        if (G.axis_relative_mode[Y_AXIS] || G.relative_mode) {
+            G.destination[Y_AXIS] += tmp;
+        } else {
+            G.destination[Y_AXIS] = tmp;
+        }
     }
 
     if (numbers_got & LETTER_Z_MASK) {
         LOG_STRING("G: using specified Z coordinate\n");
-        if (G.axis_relative_mode[Z_AXIS] || G.relative_mode)
-            G.destination[Z_AXIS] += numbers[LETTER_Z];
-        else
-            G.destination[Z_AXIS] = numbers[LETTER_Z];
+        tmp = get_coord(LETTER_X);
+        if (G.axis_relative_mode[Z_AXIS] || G.relative_mode) {
+            G.destination[Z_AXIS] += tmp;
+        } else {
+            G.destination[Z_AXIS] = tmp;
+        }
     }
     // transfer coordinates to planner
     PL.target[X_AXIS] = X_position2steps(G.destination[X_AXIS]);
@@ -145,17 +164,17 @@ bool get_arc_coordinates(bool ccw) {
 
     // Arc center is always relative to current position
     if (numbers_got & LETTER_I_MASK) { // center of arc in X
-        G.arc_center_x += numbers[LETTER_I];
+        G.arc_center_x += get_coord(LETTER_I);
     }
     if (numbers_got & LETTER_J_MASK) { // center of arc in Y
-        G.arc_center_y += numbers[LETTER_J];
+        G.arc_center_y += get_coord(LETTER_J);
     }
     LOG_STRING("G: ARC_center X:");LOG_S32(G.arc_center_x);LOG_NEWLINE;
     LOG_STRING("G: ARC_center Y:");LOG_S32(G.arc_center_y);LOG_NEWLINE;
 
     // calculate arc_center if not specified. uses the smaller arc if R>0, else the bigger one
     if (LETTER_R_MASK == (numbers_got & (LETTER_I_MASK|LETTER_J_MASK|LETTER_R_MASK))) { // neither I nor J given, but R
-        number R = numbers[LETTER_R];
+        number R = get_coord(LETTER_R);
         // calculate arc_center!
         // G.destination holds the new target, G.arc_center_x still holds the old one (as I was not given)
         number dx = G.destination[X_AXIS] - G.arc_center_x;
@@ -176,8 +195,8 @@ bool get_arc_coordinates(bool ccw) {
         LOG_STRING("G: get_arc_center: dist:");LOG_S32(dist);LOG_NEWLINE;
         LOG_STRING("G: get_arc_center: h:");LOG_S32(h);LOG_NEWLINE;
         // calculate 1st part of final arc_center
-        G.arc_center_x = dy * h / dist;
-        G.arc_center_y = -dx * h / dist;
+        G.arc_center_x = ((int64_t)dy) * ((int64_t)h) / dist;
+        G.arc_center_y = -((int64_t)dx) * ((int64_t)h) / dist;
         LOG_STRING("G: get_arc_center: relative X:");LOG_S32(G.arc_center_x);LOG_NEWLINE;
         LOG_STRING("G: get_arc_center: relative Y:");LOG_S32(G.arc_center_y);LOG_NEWLINE;
 
@@ -246,7 +265,7 @@ void process_command() {
 
     if (numbers_got & LETTER_F_MASK) { // always handle F first
         if (numbers[LETTER_F] > 0)
-            G.speed = max((numbers[LETTER_F] + 30) / 60, DEFAULT_MIN_SPEED);
+            G.speed = min(max((numbers[LETTER_F] + 30) / 60, DEFAULT_MIN_SPEED), (1000000LL*8000LL)/ (int32_t)XY_AXIS_STEPS_PER_M);
             LOG_STRING("G: set_speed to um/s: ");LOG_U32(G.speed);LOG_NEWLINE;
     }
     if (numbers_got & LETTER_G_MASK) { // handle G-codes
@@ -291,16 +310,23 @@ void process_command() {
                 PERF_STOP(3);
                 break;
 
-            case 4: // G4 dwell
+            case 4:
+                // G4 dwell
                 //LCD_MESSAGEPGM(MSG_DWELL);
-                tmp = 0;
-                if (numbers_got & LETTER_P_MASK) tmp = integers[LETTER_P]; // milliseconds to wait
-                if (numbers_got & LETTER_S_MASK) tmp += numbers[LETTER_S]; // seconds to wait
+                if (numbers_got & LETTER_P_MASK) G.delay = integers[LETTER_P]; // milliseconds to wait
+                if (numbers_got & LETTER_S_MASK) G.delay += numbers[LETTER_S]; // seconds to wait
 
                 stepper_drain_buffer();
-                tmp += millis();  // keep track of when we started waiting
-                while ((tmp - millis()) > 0 ){
+                while (LASER_RASTERDATA_can_read())
+                    LASER_RASTERDATA_pop();
+
+                tmp = millis();  // keep track of when we started waiting
+                while (G.delay) {
                     idle('D');
+                    if (tmp != millis()) {
+                        tmp = millis();
+                        G.delay--;
+                    }
                 }
                 break;
 
@@ -388,6 +414,7 @@ void process_command() {
                 break;
             #endif // G5_BEZIER
 
+#if 0
             case 7: // G7 Execute raster line: XXX Rework this!
                 LOG_STRING("G: G7 found: curent position is ");
                 LOG_U32(PL.position[X_AXIS]);LOG_COMMA;
@@ -424,10 +451,23 @@ void process_command() {
                 laser_set_mode(LASER_RASTER_CW); //XXX: support RASTER_PULSED as well !
                 planner_line(G.speed);
                 break;
+#endif
+
+            case 20: // G20 - Units in inch
+                G.coords_in_inch = TRUE;
+                break;
+
+            case 21: // G21 - Units in mm
+                G.coords_in_inch = FALSE;
+                break;
 
             case 28: //G28 Home (all) Axis
             {
                 uint8_t axis_mask = 0;
+
+                G.coords_in_inch = FALSE;
+                G.relative_mode = FALSE;
+
                 idle('H');
                 LOG_STRING("G: HOMING\n");
 
@@ -481,6 +521,7 @@ void process_command() {
                     LOG_STRING("G: No Homing Axes specified\n");
                 }
             }
+                stepper_drain_buffer();
                 break;
 
             case 90: // G90 - absolute coordinates
@@ -507,7 +548,7 @@ void process_command() {
 
         } // case (integers[LETTER_G])
     } else if ((numbers_got & LETTER_M_MASK) && !(integers[LETTER_M] & 0xffff0000)) { // handle M-codes second
-        switch ((uint16_t) integers[LETTER_M])    {
+        switch ((uint16_t) integers[LETTER_M]) {
             case 0: // M0 - undefined
                 LOG_STRING("G: M command without number!!!\n");
 
@@ -521,14 +562,15 @@ void process_command() {
                 // if running on real HW, continue program
                 break;
 
-            case 3:  //M3 - fire laser
+            case 3:  // M3 - fire laser (start spindle CW)
+            case 4:  // M4 - fire laser (start spindle CCW)
                 handle_laser_opts();
                 if (!laser.mode)
                     laser_set_mode(LASER_CW);
                 planner_move(G.speed);
                 break;
 
-            case 5:  //M5 stop firing laser
+            case 5:  // M5 - stop firing laser (stop spindle)
                 {   uint8_t tmp = laser.mode;
                     laser_set_mode(LASER_OFF);
                     planner_move(G.speed);
@@ -632,102 +674,6 @@ void process_command() {
 
             #endif //SDSUPPORT
 
-            //~ case 92: // M92 - set steps per unit  !!!BLOCKING!!!
-                //~ stepper_drain_buffer();
-                //~ if (codes_seen & LETTER_X_MASK) Config.steps_per_unit[X_AXIS] = numbers[LETTER_X];
-                //~ if (codes_seen & LETTER_Y_MASK) Config.steps_per_unit[Y_AXIS] = numbers[LETTER_Y];
-                //~ if (codes_seen & LETTER_Z_MASK) Config.steps_per_unit[Z_AXIS] = numbers[LETTER_Z];
-                //~ break;
-
-            //~ case 115: // M115
-                //~ SERIAL_PROTOCOLPGM(MSG_M115_REPORT);
-                //~ break;
-
-            //~ case 117: // M117 display message
-                //~ starpos = (strchr(strchr_pointer + 5,'*'));
-                //~ if (starpos!=NULL)
-                    //~ *(starpos-1)='\0';
-                //~ lcd_setstatus(strchr_pointer + 5);
-                //~ break;
-
-            //~ case 114: // M114
-                //~ SERIAL_PROTOCOLPGM("X:");
-                //~ SERIAL_PROTOCOL(PL.position[X_AXIS]);
-                //~ SERIAL_PROTOCOLPGM("Y:");
-                //~ SERIAL_PROTOCOL(PL.position[Y_AXIS]);
-                //~ SERIAL_PROTOCOLPGM("Z:");
-                //~ SERIAL_PROTOCOL(PL.position[Z_AXIS]);
-                //~
-                //~ SERIAL_PROTOCOLPGM(MSG_COUNT_X);
-                //~ SERIAL_PROTOCOL(number(stepper_get_position(X_AXIS))/Config.steps_per_unit[X_AXIS]);
-                //~ SERIAL_PROTOCOLPGM("Y:");
-                //~ SERIAL_PROTOCOL(number(stepper_get_position(Y_AXIS))/Config.steps_per_unit[Y_AXIS]);
-                //~ SERIAL_PROTOCOLPGM("Z:");
-                //~ SERIAL_PROTOCOL(number(stepper_get_position(Z_AXIS))/Config.steps_per_unit[Z_AXIS]);
-                //~
-                //~ SERIAL_PROTOCOLLN("");
-                //~ break;
-
-            //~ case 119: // M119
-                //~ SERIAL_PROTOCOLLN(MSG_M119_REPORT);
-                //~ #if defined(X_MIN_PIN) && X_MIN_PIN > -1
-                //~ SERIAL_PROTOCOLPGM(MSG_X_MIN);
-                //~ SERIAL_PROTOCOLLN(((READ(X_MIN_PIN)^X_MIN_ENDSTOP_INVERTING)?MSG_ENDSTOP_HIT:MSG_ENDSTOP_OPEN));
-                //~ #endif
-                //~ #if defined(X_MAX_PIN) && X_MAX_PIN > -1
-                //~ SERIAL_PROTOCOLPGM(MSG_X_MAX);
-                //~ SERIAL_PROTOCOLLN(((READ(X_MAX_PIN)^X_MAX_ENDSTOP_INVERTING)?MSG_ENDSTOP_HIT:MSG_ENDSTOP_OPEN));
-                //~ #endif
-                //~ #if defined(Y_MIN_PIN) && Y_MIN_PIN > -1
-                //~ SERIAL_PROTOCOLPGM(MSG_Y_MIN);
-                //~ SERIAL_PROTOCOLLN(((READ(Y_MIN_PIN)^Y_MIN_ENDSTOP_INVERTING)?MSG_ENDSTOP_HIT:MSG_ENDSTOP_OPEN));
-                //~ #endif
-                //~ #if defined(Y_MAX_PIN) && Y_MAX_PIN > -1
-                //~ SERIAL_PROTOCOLPGM(MSG_Y_MAX);
-                //~ SERIAL_PROTOCOLLN(((READ(Y_MAX_PIN)^Y_MAX_ENDSTOP_INVERTING)?MSG_ENDSTOP_HIT:MSG_ENDSTOP_OPEN));
-                //~ #endif
-                //~ #if defined(Z_MIN_PIN) && Z_MIN_PIN > -1
-                //~ SERIAL_PROTOCOLPGM(MSG_Z_MIN);
-                //~ SERIAL_PROTOCOLLN(((READ(Z_MIN_PIN)^Z_MIN_ENDSTOP_INVERTING)?MSG_ENDSTOP_HIT:MSG_ENDSTOP_OPEN));
-                //~ #endif
-                //~ #if defined(Z_MAX_PIN) && Z_MAX_PIN > -1
-                //~ SERIAL_PROTOCOLPGM(MSG_Z_MAX);
-                //~ SERIAL_PROTOCOLLN(((READ(Z_MAX_PIN)^Z_MAX_ENDSTOP_INVERTING)?MSG_ENDSTOP_HIT:MSG_ENDSTOP_OPEN));
-                //~ #endif
-                //~ break;
-
-            //TODO: update for all axis, use for loop
-            //~ case 201: // M201 - set Accel in units per s^2
-                //~ if (codes_seen & LETTER_X_MASK) Config.max_accel[X_AXIS] = numbers[LETTER_X];
-                //~ if (codes_seen & LETTER_Y_MASK) Config.max_accel[Y_AXIS] = numbers[LETTER_Y];
-                //~ if (codes_seen & LETTER_Z_MASK) Config.max_accel[Z_AXIS] = numbers[LETTER_Z];
-                //~ break;
-
-            //~ case 203: // M203 max G.speed mm/sec
-                //~ if (codes_seen & LETTER_X_MASK) Config.max_G.speed[X_AXIS] = numbers[LETTER_X];
-                //~ if (codes_seen & LETTER_Y_MASK) Config.max_G.speed[Y_AXIS] = numbers[LETTER_Y];
-                //~ if (codes_seen & LETTER_Z_MASK) Config.max_G.speed[Z_AXIS] = numbers[LETTER_Z];
-                //~ break;
-//~
-            //~ case 204: // M204 - acclereration S tool moves T travel only moves
-                //~ if (codes_seen & LETTER_S_MASK) Config.tool_accel = numbers[LETTER_S] ;
-                //~ if (codes_seen & LETTER_T_MASK) Config.travel_accel = numbers[LETTER_T];
-                //~ break;
-//~
-            //~ case 205: //M205 - advanced settings:  minimum travel G.speed S=while printing T=travel only, X=maximum X jerk, Y=maximum Y jerk, Z=maximum Z jerk
-                //~ if (codes_seen & LETTER_S_MASK) Config.tool_G.speed = numbers[LETTER_S];
-                //~ if (codes_seen & LETTER_T_MASK) Config.travel_G.speed = numbers[LETTER_T];
-                //~ if (codes_seen & LETTER_X_MASK) Config.jerk[X_AXIS] = numbers[LETTER_X];
-                //~ if (codes_seen & LETTER_Y_MASK) Config.jerk[Y_AXIS] = numbers[LETTER_Y];
-                //~ if (codes_seen & LETTER_Z_MASK) Config.jerk[Z_AXIS] = numbers[LETTER_Z];
-                //~ break;
-
-            //~ case 206: // M206 - additional homeing offset
-                //~ if (codes_seen & LETTER_X_MASK) offset[X_AXIS] = numbers[LETTER_X];
-                //~ if (codes_seen & LETTER_Y_MASK) offset[Y_AXIS] = numbers[LETTER_Y];
-                //~ if (codes_seen & LETTER_Z_MASK) offset[Z_AXIS] = numbers[LETTER_Z];
-                //~ break;
-
             case 400: // M400 finish all moves
                 stepper_drain_buffer();
                 break;
@@ -748,12 +694,6 @@ void process_command() {
                 //~ Config_PrintSettings();
                 //~ break;
 
-            //~ #ifdef ABORT_ON_ENDSTOP_HIT_FEATURE_ENABLED
-            //~ case 540:
-                //~ if (codes_seen & LETTER_S_MASK) abort_on_endstop_hit = integers[LETTER_S] > 0;
-                //~ break;
-            //~ #endif
-
             case 649: // M649 set laser options
                 handle_laser_opts();
                 break;
@@ -764,10 +704,18 @@ void process_command() {
         tmp_extruder = integers[LETTER_T];
         // do something? parse laser settings and store as tool T ?
 #endif
+    } else if ((codes_seen == LETTER_V_MASK) && (!numbers_got)) { // 'V' - request Version info
+        cmd_print(PSTR(":: " VERSION " :: "));
+        LOG_STRING(VERSION "\n");
+    } else if ((codes_seen == LETTER_P_MASK) && (!numbers_got)) { // 'P' - request single Laser Pulse
+        stepper_drain_buffer();
+        laser_fire(255);
+        laser_start_pulse_timer(laser.pulse_duration_us);
+        LOG_STRING("Single PULSE\n");
+        while (laser.laser_is_on) ;
     } else {
         // ignore other commands
     }
 
-    //~ ClearToSend();
 }
 

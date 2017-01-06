@@ -1,0 +1,34 @@
+=== HW ===
+  * pause/unpause key
+  * move z-dir/step to PORTF, use now free OCR3A for laser pulses
+  * howto 'scan' the workpiece / display this as background in inkscape?
+
+=== Firmware ===
+  * choose G/M-code for pause/unpause
+  * display remaining dwell time for G4
+  * correct laser pulse timing for arcs
+  * testsuite! (intermediate step: gen_tests.py)
+  * rewrite kernels to compute only (saves arc-duplication)
+  * support for software limits to crop movements (and disable laser)
+  * reuse line/home kernel for homing? or combine line&move?
+  * optimize muldiv and length2 (gcc is not nice here)
+  * support arc for cases where X_STEPS_PER_M != Y_STEPS_PER_M
+  * Fix Laser_CW for G2/G3 not working (pulsed works!)
+
+=== SW ===
+  * give pysend.py a GUI
+  * cmdline options for pysend.py
+  * provide a gcode lib for python (python2/3?)
+  * optimize renderpicture.py ('fill' algo?)
+  * relativize.py (transform coords to rel. moves)
+  * optimize.py (reduze G0-pathlen)
+
+=== workflow ===
+  * inkscape plugin: new or rework one?
+  * eagle-layouts: plugin? user-script?
+  * GUI for arranging of gcode snippets? + sending gcode? + ETA-display
+
+=== structure ===
+  * rework structure of repo
+  
+ 

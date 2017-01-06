@@ -20,7 +20,9 @@ typedef struct {
     //~ uint8_t tool;       // which 'tool'-setting to use
     bool relative_mode;  //Determines Absolute or Relative Coordinates
     bool axis_relative_mode[NUM_AXIS];
+    bool coords_in_inch;
 
+    number delay; // ms to be waited in G4
 } gcode_t;
 
 void process_command(void);

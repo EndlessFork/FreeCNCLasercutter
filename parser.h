@@ -58,6 +58,13 @@
 #define LETTER_Y_MASK ((uint32_t)1<<24)
 #define LETTER_Z_MASK ((uint32_t)1<<25)
 
+typedef enum {
+    PARSER_NEXTCHAR,        // looks good so far, give me next char
+    PARSER_OK,              // command complete, process_command was called
+    PARSER_CHECKSUM_ERROR,  // transmitted checksum did not match (cleared by '\n')
+    PARSER_FORMAT_ERROR     // format error (cleared by '\n')
+} parser_result_t;
+
 extern uint32_t codes_seen; // A is at bit 0
 extern uint32_t numbers_got; // A is at bit 0
 // result storage
@@ -70,6 +77,6 @@ extern char filename[16]; // filename for M20..M33 commands
 extern uint8_t filename_len; // amount of valid characters in filename
 
 void parser_init(void);
-bool process_char(char c);
+parser_result_t process_char(char c);
 
 #endif

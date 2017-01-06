@@ -729,11 +729,12 @@ int8_t usb_serial_set_control(uint8_t signals)
 //
 ISR(USB_GEN_vect)
 {
-    uint8_t int16_tbits, t;
+    uint8_t intbits, t;
 
-        int16_tbits = UDINT;
-        UDINT = 0;
-        if (int16_tbits & (1<<EORSTI)) {
+    ACTIVE_IRQ_5;
+    intbits = UDINT;
+    UDINT = 0;
+    if (intbits & (1<<EORSTI)) {
         UENUM = 0;
         UECONX = 1;
         UECFG0X = EP_TYPE_CONTROL;
@@ -742,7 +743,7 @@ ISR(USB_GEN_vect)
         usb_configuration = 0;
         cdc_line_rtsdtr = 0;
         }
-    if (int16_tbits & (1<<SOFI)) {
+    if (intbits & (1<<SOFI)) {
         if (usb_configuration) {
             t = transmit_flush_timer;
             if (t) {
@@ -754,6 +755,7 @@ ISR(USB_GEN_vect)
             }
         }
     }
+    ACTIVE_IRQ_NONE;
 }
 
 
@@ -781,11 +783,13 @@ static inline void usb_ack_out(void)
 // other endpoints are manipulated by the user-callable
 // functions, and the start-of-frame interrupt.
 //
-ISR(USB_COM_vect)
+
+//ISR(USB_COM_vect)
+void _USB_COM(void)
 {
-        uint8_t int16_tbits;
+    uint8_t int16_tbits;
     const uint8_t *list;
-        const uint8_t *cfg;
+    const uint8_t *cfg;
     uint8_t i, n, len, en;
     uint8_t *p;
     uint8_t bmRequestType;
@@ -944,4 +948,9 @@ ISR(USB_COM_vect)
     UECONX = (1<<STALLRQ) | (1<<EPEN);    // stall
 }
 
+ISR(USB_COM_vect) {
+    ACTIVE_IRQ_6;
+    _USB_COM();
+    ACTIVE_IRQ_NONE;
+}
 

@@ -31,6 +31,7 @@ void planner_init(void) {
 void planner_move(number speed) {
     planner_t *p = &PL;
     block_t *b;
+    uint32_t line_length_um = length2(X_steps2position(p->position[0]-p->target[0]),Y_steps2position(p->position[1]-p->target[1]));
     b = &(STEPPER_QUEUE_data[STEPPER_QUEUE_head]);
 
     speed++; // silence stupid warning!
@@ -46,8 +47,15 @@ void planner_move(number speed) {
     b->line.direction_bits = ((p->position[X_AXIS] > p->target[X_AXIS])?1:0) |
                             ((p->position[Y_AXIS] > p->target[Y_AXIS])?2:0) |
                             ((p->position[Z_AXIS] > p->target[Z_AXIS])?4:0);
+    //~ F_CPU * line_length_um / um_per_s = total ticks
+    //~ ticks_per_major_step = total ticks / num_major_steps = F_CPU * line_length_um / (um_per_s * num_major_steps);
+    b->base_ticks = F_CPU * ((uint64_t) line_length_um) / (((uint64_t) speed) * ((uint64_t) (max(b->line.steps[X_AXIS], b->line.steps[Y_AXIS]))));
+    //~ b->base_ticks = 40404L * length2(b->line.steps[X_AXIS], b->line.steps[Y_AXIS]) / max(b->line.steps[X_AXIS], b->line.steps[Y_AXIS]);
+    if (b->base_ticks < 2000)
+        LOG_STRING("STEPS TOO FAST");
+    LOG_STRING("base_ticks:");LOG_X16(b->base_ticks);LOG_NEWLINE;
+
     b->job = STEPPER_MOVE_TO;
-    b->base_ticks = 0xffff; // atm. ignored anyway.
 
     LOG_STRING("STEPPER_QUEUE_push(");
     LOG_STRING("\n steps_x = ");LOG_U24(b->line.steps[X_AXIS]);
@@ -94,6 +102,7 @@ void planner_line(number speed) {
     //~ b->base_ticks = 40404L * length2(b->line.steps[X_AXIS], b->line.steps[Y_AXIS]) / max(b->line.steps[X_AXIS], b->line.steps[Y_AXIS]);
     if (b->base_ticks < 2000)
         LOG_STRING("STEPS TOO FAST");
+    LOG_STRING("base_ticks:");LOG_X16(b->base_ticks);LOG_NEWLINE;
 
     b->job = STEPPER_LINE;
 
@@ -135,6 +144,8 @@ void planner_line(number speed) {
 
 void planner_arc(number speed, bool ccw) {
     planner_t *p = &PL;
+    block_t *b;
+    b = &(STEPPER_QUEUE_data[STEPPER_QUEUE_head]);
 
     LOG_STRING("planner:planner_arc(");LOG_U8(ccw);
     LOG_STRING(")\n");
@@ -150,6 +161,12 @@ void planner_arc(number speed, bool ccw) {
     StepperPos fy = p->position[Y_AXIS] - p->arc_center_y;
     StepperPos ty = p->target[Y_AXIS] - p->arc_center_y;
     uint32_t R = max(length2(fx, fy), length2(tx, ty));
+
+
+    b->base_ticks = (F_CPU * (int64_t) 1000000UL) / ( XY_AXIS_STEPS_PER_M * (uint64_t) speed);
+    if (b->base_ticks < 2000)
+        LOG_STRING("STEPS TOO FAST");
+    LOG_STRING("base_ticks:");LOG_X16(b->base_ticks);LOG_NEWLINE;
 
     buffer_arc(R, fx, fy, tx, ty, ccw);
 

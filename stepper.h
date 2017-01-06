@@ -6,6 +6,17 @@
 #include "buffer.h"
 #include "laser.h"
 
+
+#define KERNEL_FLAG_X_NEG ((uint8_t) 1)
+#define KERNEL_FLAG_X_POS ((uint8_t) 2)
+#define KERNEL_FLAG_Y_NEG ((uint8_t) 4)
+#define KERNEL_FLAG_Y_POS ((uint8_t) 8)
+#define KERNEL_FLAG_Z_NEG ((uint8_t) 16)
+#define KERNEL_FLAG_Z_POS ((uint8_t) 32)
+#define KERNEL_FLAG_LASER ((uint8_t) 64)
+#define KERNEL_FLAG_FINISH ((uint8_t) 128)
+
+
 typedef enum {
     STEPPER_IDLE = 0,
     STEPPER_HOME,           // finding refswitches
@@ -14,24 +25,24 @@ typedef enum {
     STEPPER_LINE,           // may modulate the laser with rasterdata
 
     STEPPER_ARC_CCW = 16,
-    STEPPER_ARC_CCW_OCT0 = 16, // 16..23: 8 octants for CCW arcs
-    STEPPER_ARC_CCW_OCT1 = 17,
-    STEPPER_ARC_CCW_OCT2 = 18,
-    STEPPER_ARC_CCW_OCT3 = 19,
-    STEPPER_ARC_CCW_OCT4 = 20,
-    STEPPER_ARC_CCW_OCT5 = 21,
-    STEPPER_ARC_CCW_OCT6 = 22,
-    STEPPER_ARC_CCW_OCT7 = 23,
+    STEPPER_ARC_CCW_OCT1 = 16, // 16..23: 8 octants for CCW arcs
+    STEPPER_ARC_CCW_OCT2 = 17,
+    STEPPER_ARC_CCW_OCT3 = 18,
+    STEPPER_ARC_CCW_OCT4 = 19,
+    STEPPER_ARC_CCW_OCT5 = 20,
+    STEPPER_ARC_CCW_OCT6 = 21,
+    STEPPER_ARC_CCW_OCT7 = 22,
+    STEPPER_ARC_CCW_OCT8 = 23,
 
     STEPPER_ARC_CW = 24,
-    STEPPER_ARC_CW_OCT0 = 24, // 24..31: 8 octants for CW arcs
-    STEPPER_ARC_CW_OCT1 = 25,
-    STEPPER_ARC_CW_OCT2 = 26,
-    STEPPER_ARC_CW_OCT3 = 27,
-    STEPPER_ARC_CW_OCT4 = 28,
-    STEPPER_ARC_CW_OCT5 = 29,
-    STEPPER_ARC_CW_OCT6 = 30,
-    STEPPER_ARC_CW_OCT7 = 31
+    STEPPER_ARC_CW_OCT1 = 24, // 24..31: 8 octants for CW arcs
+    STEPPER_ARC_CW_OCT2 = 25,
+    STEPPER_ARC_CW_OCT3 = 26,
+    STEPPER_ARC_CW_OCT4 = 27,
+    STEPPER_ARC_CW_OCT5 = 28,
+    STEPPER_ARC_CW_OCT6 = 29,
+    STEPPER_ARC_CW_OCT7 = 30,
+    STEPPER_ARC_CW_OCT8 = 31
 
 } stepper_job_t;
 
